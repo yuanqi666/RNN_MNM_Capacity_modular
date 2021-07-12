@@ -45,6 +45,8 @@ rules_dict = \
     'MNM_sequential_phase1_m','MNM_sequential_phase1_nm','MNM_sequential_phase2','MNM_sequential_phase3','MNM_sequential_phase4'],
 
     'Capacity_6tasks':['Capacity_color','overlap','zero_gap','gap','odr','odrd','gap500',],
+
+    'Capacity_mix_delay001001_6tasks':['Capacity_color_mix_uniform_001001','overlap','zero_gap','gap','odr','odrd','gap500',],
     }
 
 # Store indices of rules
@@ -98,9 +100,9 @@ class Trial(object):
         self.batch_size = batch_size
         self.tdim = tdim
         self.x = np.zeros((tdim, batch_size, self.n_input), dtype=self.float_type)
-        self.input_loc = list()# add by yichen
-        self.output_loc = list()# add by yichen
-        self.distract_loc = list()# add by yichen
+        #self.input_loc = list()# add by yichen
+        #self.output_loc = list()# add by yichen
+        #self.distract_loc = list()# add by yichen
         self.y = np.zeros((tdim, batch_size, self.n_output), dtype=self.float_type)
         if self.config['loss_type'] == 'lsq':
             self.y[:,:,:] = 0.05
@@ -149,7 +151,7 @@ class Trial(object):
                         self.x[ons[i]: offs[i], i, 1+color*self.n_eachring:1+(color+1)*self.n_eachring] \
                             += self.add_x_loc(locs[i])*mods[i][color]
 
-                self.input_loc.append(self.add_x_loc(locs[i]))#add by yichen
+                #self.input_loc.append(self.add_x_loc(locs[i]))#add by yichen
             #########################add by yichen###############################################
             elif loc_type == 'distract':
                 # Assuming that mods[i] starts from 1
@@ -160,7 +162,7 @@ class Trial(object):
                     for color in range(len(mods[i])): #0:Red 1:Green 2:Blue
                         self.x[ons[i]: offs[i], i, 1+color*self.n_eachring:1+(color+1)*self.n_eachring] \
                             += self.add_x_loc(locs[i])*mods[i][color]
-                self.distract_loc.append(self.add_x_loc(locs[i]))
+                #self.distract_loc.append(self.add_x_loc(locs[i]))
             elif loc_type == 'choice':
                 # Assuming that mods[i] starts from 1
                 if not isinstance(mods[i], tuple):
@@ -183,10 +185,10 @@ class Trial(object):
             elif loc_type == 'out':
                 if self.config['loss_type'] == 'lsq':
                     self.y[ons[i]: offs[i], i, 1:] += self.add_y_loc(locs[i])*strengths[i]
-                    self.output_loc.append(self.add_y_loc(locs[i]))#add by yichen
+                    #self.output_loc.append(self.add_y_loc(locs[i]))#add by yichen
                 else:
                     y_tmp = self.add_y_loc(locs[i])
-                    self.output_loc.append(y_tmp)#add by yichen
+                    #self.output_loc.append(y_tmp)#add by yichen
                     y_tmp /= np.sum(y_tmp)
                     self.y[ons[i]: offs[i], i, 1:] += y_tmp
                 self.y_loc[ons[i]: offs[i], i] = locs[i]
@@ -399,6 +401,11 @@ def odr_(config, mode, anti_response, delay1_time, **kwargs):
                    'delay1'   : (stim_offs, fix_offs),
                    'go1'      : (fix_offs, None)}
 
+    trial.location_info = { 'fix1':[None]*len(stim_locs),
+                            'stim1':stim_locs,
+                            'delay1':stim_locs,
+                            'go1':response_locs,}
+
     return trial
 # add by yichen
 def odr(config, mode, **kwargs):
@@ -512,6 +519,13 @@ def odrd_(config, mode, **kwargs):
                    'delay2'    : (distract_offs,fix_offs),
                    'go1'       : (fix_offs, None)}
 
+    trial.location_info = { 'fix1':[None]*len(stim_locs),
+                            'stim1':stim_locs,
+                            'delay1':stim_locs,
+                            'distract1':distract_locs,
+                            'delay2':stim_locs,
+                            'go1':response_locs,}
+
     return trial
 
 # add by yichen
@@ -566,6 +580,10 @@ def overlap_(config, mode, anti_response, **kwargs):
     trial.epochs = {'fix1'     : (None, stim_ons),
                    'stim1'     : (stim_ons, stim_offs),
                    'go1'      : (fix_offs, None)}
+
+    trial.location_info = { 'fix1':[None]*len(stim_locs),
+                            'stim1':stim_locs,
+                            'go1':response_locs,}
 
     return trial
 # add by yichen
@@ -624,6 +642,10 @@ def zero_gap_(config, mode, anti_response, **kwargs):
     trial.epochs = {'fix1'     : (None, stim_ons),
                    'stim1'     : (stim_ons, stim_offs),
                    'go1'      : (stim_ons, None)}
+
+    trial.location_info = { 'fix1':[None]*len(stim_locs),
+                            'stim1':stim_locs,
+                            'go1':response_locs,}
 
     return trial
 # add by yichen
@@ -684,6 +706,11 @@ def gap_(config, mode, anti_response, gap_time, **kwargs):
                    'delay1'      : (fix_offs,stim_ons),
                    'stim1'     : (stim_ons, stim_offs),
                    'go1'      : (stim_ons, None)}
+
+    trial.location_info = { 'fix1':[None]*len(stim_locs),
+                            'stim1':stim_locs,
+                            'delay1':stim_locs,
+                            'go1':response_locs,}
 
     return trial
 # add by yichen
@@ -826,6 +853,13 @@ def match_or_non_(config, mode, easy_task, passive, **kwargs):
                    'delay2'    : (stim2_offs, choice_ons),
                    'go1'       : (fix_offs, None)} #go period is also the choice display period
 
+    trial.location_info = { 'fix1':[None]*len(stim1_locs),
+                            'stim1':stim1_locs,
+                            'delay1':stim1_locs,
+                            'stim2':stim2_locs,
+                            'delay2':stim2_locs,
+                            'go1':response_locs,}
+
     return trial
 
 def match_or_non(config, mode, **kwargs):
@@ -928,6 +962,13 @@ def MNM_color_(config, mode, delaytime, **kwargs):
                    'delay2'    : (stim2_offs, choice_ons),
                    'go1'       : (fix_offs, None)} #go period is also the choice display period
 
+    trial.location_info = { 'fix1':[None]*len(stim1_locs),
+                            'stim1':stim1_locs,
+                            'delay1':stim1_locs,
+                            'stim2':stim2_locs,
+                            'delay2':stim2_locs,
+                            'go1':response_locs,}
+
     return trial
 
 def MNM_color(config, mode, **kwargs): #0.5s delay
@@ -1027,6 +1068,13 @@ def MNM_strength_(config, mode, **kwargs):
                    'delay2'    : (stim2_offs, choice_ons),
                    'go1'       : (fix_offs, None)} #go period is also the choice display period
 
+    trial.location_info = { 'fix1':[None]*len(stim1_locs),
+                            'stim1':stim1_locs,
+                            'delay1':stim1_locs,
+                            'stim2':stim2_locs,
+                            'delay2':stim2_locs,
+                            'go1':response_locs,}
+
     return trial
 
 def MNM_strength(config, mode, **kwargs):
@@ -1123,6 +1171,13 @@ def MNM_sequential_phase_1_(config, mode, MorNM, **kwargs):
                    'delay2'    : (stim2_offs, choice_ons),
                    'go1'       : (fix_offs, None)} #go period is also the choice display period
 
+    trial.location_info = { 'fix1':[None]*len(stim1_locs),
+                            'stim1':stim1_locs,
+                            'delay1':stim1_locs,
+                            'stim2':stim2_locs,
+                            'delay2':stim2_locs,
+                            'go1':response_locs,}
+
     return trial
 
 def MNM_sequential_phase_2_(config, mode, **kwargs): #def MNM_sequential_phase_1_2_(config, mode, phase, **kwargs):
@@ -1216,6 +1271,13 @@ def MNM_sequential_phase_2_(config, mode, **kwargs): #def MNM_sequential_phase_1
                    'delay2'    : (stim2_offs, choice_ons),
                    'go1'       : (fix_offs, None)} #go period is also the choice display period
 
+    trial.location_info = { 'fix1':[None]*len(stim1_locs),
+                            'stim1':stim1_locs,
+                            'delay1':stim1_locs,
+                            'stim2':stim2_locs,
+                            'delay2':stim2_locs,
+                            'go1':response_locs,}
+
     return trial
 
 def MNM_sequential_phase_3_4_(config, mode, delaytime, **kwargs):
@@ -1306,6 +1368,13 @@ def MNM_sequential_phase_3_4_(config, mode, delaytime, **kwargs):
                    'delay2'    : (stim2_offs, choice_ons),
                    'go1'       : (fix_offs, None)} #go period is also the choice display period
 
+    trial.location_info = { 'fix1':[None]*len(stim1_locs),
+                            'stim1':stim1_locs,
+                            'delay1':stim1_locs,
+                            'stim2':stim2_locs,
+                            'delay2':stim2_locs,
+                            'go1':response_locs,}
+
     return trial
 
 def MNM_sequential_phase1_m(config, mode, **kwargs):
@@ -1319,20 +1388,19 @@ def MNM_sequential_phase3(config, mode, **kwargs):
 def MNM_sequential_phase4(config, mode, **kwargs):
     return MNM_sequential_phase_3_4_(config, mode, 1500, **kwargs)
 
-def Capacity_color_(config, mode, delaytime, **kwargs):
+def Capacity_color_(config, mode, delaytime, stim_per_epoch,**kwargs):
     #                delay1    delay2
     # ----------^^^^^-----^^^^^-----^^^^^
     #           stim1     stim2     choice
     # ------------------------------>>>>>
     #            fixation            go
     #
-    #>72 n_eachring suggested
     dt = config['dt']
     rng = config['rng']
     if mode == 'random': # Randomly generate parameters
         #Stimuli
         batch_size = kwargs['batch_size']
-        stim1s = rng.rand(5,batch_size)*2*np.pi
+        stim1s = rng.rand(stim_per_epoch,batch_size)*2*np.pi
         devi_dist = np.zeros_like(stim1s)
         match_or_not = rng.randint(0,2,batch_size) #an array consists of 0&1 with the size of stim1_locs. 0 is match 1 is non-match
         devi_dist[0,:] = rng.randint(1,config['n_eachring'])*(2*np.pi/config['n_eachring'])*match_or_not
@@ -1358,7 +1426,7 @@ def Capacity_color_(config, mode, delaytime, **kwargs):
         batch_size = np.prod(batch_shape)
         ind_stim_loc, _ = np.unravel_index(range(batch_size),batch_shape)
 
-        stim1s = rng.rand(5,batch_size)*2*np.pi
+        stim1s = rng.rand(stim_per_epoch,batch_size)*2*np.pi
 
         stim1s[0,:]  = 2*np.pi*ind_stim_loc/n_stim_loc
         
@@ -1393,15 +1461,29 @@ def Capacity_color_(config, mode, delaytime, **kwargs):
     # Response locations
     response_locs = (M_choice_loc+match_or_not*np.pi)%(2*np.pi)
 
+    stim_ring_indexes = rng.randint(stim_per_epoch, size=batch_size) #which ring will the changable stimulus be
+    stim_mods_ = np.zeros((batch_size,stim_per_epoch),dtype=int)
+    for tn, idx in enumerate(stim_ring_indexes):
+        stim_mods_[tn,idx] = 1
+    stim_mods = [tuple(i) for i in stim_mods_]
+
     trial = Trial(config, tdim, batch_size)
 
     trial.add('fix_in', offs=fix_offs)
-    trial.add('stim', stim1s[0], ons=stim1_ons, offs=stim1_offs, mods=(1,1,1))#RGB(white)
-    trial.add('stim', stim2s[0], ons=stim2_ons, offs=stim2_offs, mods=(1,1,1))#RGB(white)
-    for i in range(1,5):
-        trial.add('distract', stim1s[i], ons=stim1_ons, offs=stim1_offs, mods=(1,1,1))#RGB(white)
-    for i in range(1,5):
-        trial.add('distract', stim2s[i], ons=stim2_ons, offs=stim2_offs, mods=(1,1,1))#RGB(white)
+    #trial.add('stim', stim1s[0], ons=stim1_ons, offs=stim1_offs, mods=(1,1,1))#RGB(white)
+    #trial.add('stim', stim2s[0], ons=stim2_ons, offs=stim2_offs, mods=(1,1,1))#RGB(white)
+    trial.add('stim', stim1s[0], ons=stim1_ons, offs=stim1_offs, mods=stim_mods)
+    trial.add('stim', stim2s[0], ons=stim2_ons, offs=stim2_offs, mods=stim_mods)
+    for i in range(1,stim_per_epoch):
+        #trial.add('distract', stim1s[i], ons=stim1_ons, offs=stim1_offs, mods=(1,1,1))#RGB(white)
+        #trial.add('distract', stim2s[i], ons=stim2_ons, offs=stim2_offs, mods=(1,1,1))#RGB(white)
+        distract_ring_indexes = (stim_ring_indexes+i)%stim_per_epoch
+        distr_mods_ = np.zeros((batch_size,stim_per_epoch),dtype=int)
+        for tn, idx in enumerate(distract_ring_indexes):
+            distr_mods_[tn,idx] = 1
+        distr_mods = [tuple(i) for i in distr_mods_]
+        trial.add('distract', stim1s[i], ons=stim1_ons, offs=stim1_offs, mods=distr_mods)#RGB(white)
+        trial.add('distract', stim2s[i], ons=stim2_ons, offs=stim2_offs, mods=distr_mods)#RGB(white)
 
     trial.add('choice', M_choice_loc, ons=choice_ons, mods=(0,1,0))#Green
     trial.add('choice', NM_choice_loc, ons=choice_ons, mods=(0,0,1))#Blue
@@ -1418,12 +1500,155 @@ def Capacity_color_(config, mode, delaytime, **kwargs):
                    'delay2'    : (stim2_offs, choice_ons),
                    'go1'       : (fix_offs, None)} #go period is also the choice display period
 
+    trial.location_info = { 'fix1':[None]*len(stim1s[0]),
+                            'stim1':stim1s[0],
+                            'delay1':stim1s[0],
+                            'stim2':stim2s[0],
+                            'delay2':stim2s[0],
+                            'go1':response_locs,}
+
     #TODO:add task info here
 
     return trial
 
 def Capacity_color(config, mode, **kwargs):
-    return Capacity_color_(config, mode, 500, **kwargs)
+    return Capacity_color_(config, mode, 500, 3, **kwargs)
+
+def Capacity_color_mix_uniform_(config, mode, stim_per_epoch, delay_time_bound=(0,1000), delay_step=None,**kwargs):
+    #                delay1    delay2
+    # ----------^^^^^-----^^^^^-----^^^^^
+    #           stim1     stim2     choice
+    # ------------------------------>>>>>
+    #            fixation            go
+    #
+    dt = config['dt']
+    rng = config['rng']
+    if mode == 'random': # Randomly generate parameters
+        #Stimuli
+        batch_size = kwargs['batch_size']
+        stim1s = rng.rand(stim_per_epoch,batch_size)*2*np.pi
+        devi_dist = np.zeros_like(stim1s)
+        match_or_not = rng.randint(0,2,batch_size) #an array consists of 0&1 with the size of stim1_locs. 0 is match 1 is non-match
+        devi_dist[0,:] = rng.randint(1,config['n_eachring'])*(2*np.pi/config['n_eachring'])*match_or_not
+        stim2s = (stim1s + devi_dist)%(2*np.pi)
+
+        if delay_step is None:
+            delay_time = np.random.uniform(delay_time_bound[0],delay_time_bound[1],batch_size)
+        else:
+            time_range = list(range(delay_time_bound[0],delay_time_bound[1]+1,delay_step))
+            delay_time = np.random.choice(time_range,size=(batch_size))
+
+
+        # Timeline
+        stim1_ons  = int(1000/dt)
+        stim1_offs = stim1_ons + int(500/dt) #last for 0.5s
+
+        stim2_ons= stim1_offs+(delay_time/dt).astype(np.int32) #delay
+        stim2_offs= stim2_ons+int(500/dt) # last for 0.5s
+
+        max_fix_off = stim1_offs + int(500/dt) + 2*int(delay_time_bound[1]/dt)
+
+        choice_ons= stim2_offs + (delay_time/dt).astype(np.int32) #delay
+
+        fix_offs = choice_ons
+
+        tdim     = max_fix_off + int(500/dt)
+
+    elif 'test' in mode:
+        #Stimuli
+        n_stim_loc, _ = batch_shape = config['n_eachring'], 16
+        batch_size = np.prod(batch_shape)
+        ind_stim_loc, _ = np.unravel_index(range(batch_size),batch_shape)
+
+        stim1s = rng.rand(stim_per_epoch,batch_size)*2*np.pi
+
+        stim1s[0,:]  = 2*np.pi*ind_stim_loc/n_stim_loc
+        
+        match_or_not = np.unravel_index(range(batch_size),(config['n_eachring']*2,8))[0]%2
+        devi_dist = np.zeros_like(stim1s)
+        devi_dist[0,:] = match_or_not*np.pi
+
+        stim2s = (stim1s + devi_dist)%(2*np.pi)
+
+        #Timeline
+        delay_time = int(mode.split('-')[1])
+        stim1_ons  = int(1000/dt)
+        stim1_offs = stim1_ons + int(500/dt) #last for 0.5s
+
+        stim2_ons= stim1_offs+int(delay_time/dt) #delay
+        stim2_offs= stim2_ons+int(500/dt) # last for 0.5s
+
+        choice_ons= stim2_offs+int(delay_time/dt) #delay
+
+        fix_offs = choice_ons
+        
+        tdim     = fix_offs + int(500/dt)
+
+    else:
+        raise ValueError('Unknown mode: ' + str(mode))
+
+    check_ons= fix_offs + int(100/dt)
+    check_offs = fix_offs + int(500/dt)
+
+    # Match and Non-Match choice location
+    M_choice_loc = np.random.randint(config['n_eachring'],size=batch_size)*(2*np.pi/config['n_eachring'])
+    NM_choice_loc = (M_choice_loc+np.pi)%(2*np.pi)
+
+    # Response locations
+    response_locs = (M_choice_loc+match_or_not*np.pi)%(2*np.pi)
+
+    stim_ring_indexes = rng.randint(stim_per_epoch, size=batch_size) #which ring will the changable stimulus be
+    stim_mods_ = np.zeros((batch_size,stim_per_epoch),dtype=int)
+    for tn, idx in enumerate(stim_ring_indexes):
+        stim_mods_[tn,idx] = 1
+    stim_mods = [tuple(i) for i in stim_mods_]
+
+    trial = Trial(config, tdim, batch_size)
+
+    trial.add('fix_in', offs=fix_offs)
+    #trial.add('stim', stim1s[0], ons=stim1_ons, offs=stim1_offs, mods=(1,1,1))#RGB(white)
+    #trial.add('stim', stim2s[0], ons=stim2_ons, offs=stim2_offs, mods=(1,1,1))#RGB(white)
+    trial.add('stim', stim1s[0], ons=stim1_ons, offs=stim1_offs, mods=stim_mods)
+    trial.add('stim', stim2s[0], ons=stim2_ons, offs=stim2_offs, mods=stim_mods)
+    for i in range(1,stim_per_epoch):
+        #trial.add('distract', stim1s[i], ons=stim1_ons, offs=stim1_offs, mods=(1,1,1))#RGB(white)
+        #trial.add('distract', stim2s[i], ons=stim2_ons, offs=stim2_offs, mods=(1,1,1))#RGB(white)
+        distract_ring_indexes = (stim_ring_indexes+i)%stim_per_epoch
+        distr_mods_ = np.zeros((batch_size,stim_per_epoch),dtype=int)
+        for tn, idx in enumerate(distract_ring_indexes):
+            distr_mods_[tn,idx] = 1
+        distr_mods = [tuple(i) for i in distr_mods_]
+        trial.add('distract', stim1s[i], ons=stim1_ons, offs=stim1_offs, mods=distr_mods)#RGB(white)
+        trial.add('distract', stim2s[i], ons=stim2_ons, offs=stim2_offs, mods=distr_mods)#RGB(white)
+
+    trial.add('choice', M_choice_loc, ons=choice_ons, mods=(0,1,0))#Green
+    trial.add('choice', NM_choice_loc, ons=choice_ons, mods=(0,0,1))#Blue
+
+    trial.add('fix_out', offs=fix_offs)
+    trial.add('out', response_locs, ons=fix_offs)
+    
+    trial.add_c_mask(pre_offs=fix_offs, post_ons=check_ons, post_offs=check_offs)
+
+    trial.epochs = {'fix1'     : (None, stim1_ons),
+                   'stim1'     : (stim1_ons, stim1_offs),
+                   'delay1'    : (stim1_offs, stim2_ons),
+                   'stim2'     : (stim2_ons, stim2_offs),
+                   'delay2'    : (stim2_offs, choice_ons),
+                   'go1'       : (fix_offs, None)} #go period is also the choice display period
+
+    trial.location_info = { 'fix1':[None]*len(stim1s[0]),
+                            'stim1':stim1s[0],
+                            'delay1':stim1s[0],
+                            'stim2':stim2s[0],
+                            'delay2':stim2s[0],
+                            'go1':response_locs,}
+
+    #TODO:add task info here
+
+    return trial
+
+def Capacity_color_mix_uniform_001001(config, mode, **kwargs):
+    return Capacity_color_mix_uniform_(config, mode, 3, delay_time_bound=(0,1000), delay_step=100,**kwargs)
 
 rule_mapping = {
                 'odr': odr,
@@ -1460,6 +1685,7 @@ rule_mapping = {
                 'MNM_sequential_phase3':MNM_sequential_phase3,
                 'MNM_sequential_phase4':MNM_sequential_phase4,
                 'Capacity_color':Capacity_color,
+                'Capacity_color_mix_uniform_001001':Capacity_color_mix_uniform_001001,
                 }
 
 rule_name    = {
@@ -1496,7 +1722,8 @@ rule_name    = {
                 'MNM_sequential_phase2':'MNM seq phase2',
                 'MNM_sequential_phase3':'MNM seq phase3',
                 'MNM_sequential_phase4':'MNM seq phase4',
-                'Capacity_color':'Capacity task'
+                'Capacity_color':'Capacity task',
+                'Capacity_color_mix_uniform_001001':'Capacity mix delay 0s~1s,0.1s',
                 }
 
 

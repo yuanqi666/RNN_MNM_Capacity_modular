@@ -199,6 +199,44 @@ def mkdir_p(path):
         else:
             raise
 
+def slice_H(H,time_range=None,trial_range=None,neuron_range=None):
+    """
+    time/trial/neuron range can be list, tuple, int or None.
+    int and list refer to specific index(es)
+    tuple refer to a range of indexes
+    None refer to all the indexes in that axis
+    """
+    def expand(x,axis,shape):
+        if x is None:
+            return range(shape[axis])
+        elif isinstance(x, tuple):
+            if x[0] is None:
+                start = 0
+            else:
+                start = x[0]
+            if x[1] is None:
+                end = shape[axis]
+            else:
+                end = x[1]
+            return range(start,end)
+        elif isinstance(x,int):
+            return [x]
+        elif isinstance(x,list):
+            return x
+        else:
+            raise TypeError("time/trial/neuron range should be list, tuple, int or None.")
+    
+    H_shape = np.shape(H)
+    sliced_H = np.full(H_shape, np.nan)
+    time_range = expand(time_range,axis=0,shape=H_shape)
+    trial_range = expand(trial_range,axis=1,shape=H_shape)
+    neuron_range = expand(neuron_range,axis=2,shape=H_shape)
+
+    sliced_H[np.ix_(time_range,trial_range,neuron_range)] = H[np.ix_(time_range,trial_range,neuron_range)]
+
+    return sliced_H
+
+
 
 def gen_ortho_matrix(dim, rng=None):
     """Generate random orthogonal matrix
@@ -229,9 +267,11 @@ def smooth(ori_array, smooth_window,):# if you don't need smooth, set smooth_win
 
     return smoothed_array
 
-def auto_model_select(hp,log,smooth_window=9,perf_margin=0.05,max_model_num_limit=30):# if you don't need smooth, set smooth_window to 0
+def auto_model_select(hp,log,rules=None,smooth_window=9,perf_margin=0.05,max_model_num_limit=30):# if you don't need smooth, set smooth_window to 0
     model_select = dict()
-    for rule in hp['rules']:
+    if rules is None:
+        rules = hp['rules']
+    for rule in rules:
         model_select[rule] = dict()
         for key in ['mature','mid','early']:
             model_select[rule][key] = list()
@@ -261,23 +301,17 @@ def auto_model_select(hp,log,smooth_window=9,perf_margin=0.05,max_model_num_limi
 
     return model_select
 
-def get_mon_trials(task_info_rule, input_loc_type, chosen_loc, MoNM):
-
-    input_locs = task_info_rule[input_loc_type]
-    stim1_locs = task_info_rule['in_loc']
-    stim2_locs = task_info_rule['in_loc_2']
-    m_nm = [st[0]==st[1] for st in zip(stim1_locs,stim2_locs)]
-
-    chosen_loc_trials = input_locs == chosen_loc 
+def get_mon_trials(stim1_locs, stim2_locs, MoNM):
 
     if MoNM == 'match':
-        return [z[0] and z[1] for z in zip(chosen_loc_trials,m_nm)]
+        return [st[0]==st[1] for st in zip(stim1_locs,stim2_locs)]
     elif MoNM == 'non-match':
-        return [z[0] and not z[1] for z in zip(chosen_loc_trials,m_nm)]
+        return [st[0]!=st[1] for st in zip(stim1_locs,stim2_locs)]
 
-def model_list_parser(hp, log, rule, model_list, margin=0.15):
+def model_list_parser(hp, log, rule, model_list, margin=0):
     if isinstance(model_list, dict):
-        model_list = model_list[rule]
+        #model_list = model_list[rule]
+        return model_list
     elif isinstance(model_list, list):
         temp_list = dict()
         for m_key in ['mature','mid','early']:
@@ -285,9 +319,11 @@ def model_list_parser(hp, log, rule, model_list, margin=0.15):
         
         for model_index in model_list:
             growth = log['perf_'+rule][model_index//log['trials'][1]]
-            if  growth > hp['mature_target_perf']-margin:
+            #if  growth > hp['mature_target_perf']-margin:
+            if  growth > hp['mid_target_perf']-margin:
                 temp_list['mature'].append(model_index)
-            elif growth > hp['mid_target_perf']-margin:
+            #elif growth > hp['mid_target_perf']-margin:
+            elif growth > hp['early_target_perf']-margin:
                 temp_list['mid'].append(model_index)
             else:
                 temp_list['early'].append(model_index)
@@ -295,3 +331,94 @@ def model_list_parser(hp, log, rule, model_list, margin=0.15):
         model_list = temp_list
 
     return model_list  
+
+def max_central(max_index,tuning1,tuning2=None): #tuning1->max central, tuning2's index change with tuning1 
+
+    temp_len = len(tuning1)
+    if temp_len%2 == 0:
+        mc_len = temp_len + 1
+    else:
+        mc_len = temp_len
+
+    firerate_max_central = np.zeros(mc_len)
+    if tuning2 is not None:
+        tuning2_shift = np.zeros(mc_len)
+
+    for i in range(temp_len):
+        new_index = (i-max_index+temp_len//2)%temp_len
+        firerate_max_central[new_index] = tuning1[i]
+        if tuning2 is not None:
+            tuning2_shift[new_index] = tuning2[i]
+    if temp_len%2 == 0:
+        firerate_max_central[-1] = firerate_max_central[0]
+        if tuning2 is not None:
+            tuning2_shift[-1] = tuning2_shift[0]
+
+    if tuning2 is not None:
+        return firerate_max_central, tuning2_shift
+    else:
+        return firerate_max_central
+
+def gaussian_curve_fit(tuning):
+    import math
+    from scipy.optimize import curve_fit
+
+    def gaussian(x, a,u, sig):
+        return a*np.exp(-(x - u) ** 2 / (2 * sig ** 2)) / (sig * math.sqrt(2 * math.pi))
+    
+    temp_x = np.arange(len(tuning))
+    gaussian_x = np.arange(-0.1,len(tuning)-0.9,0.1)
+    paras , _ = curve_fit(gaussian,temp_x,tuning+(-1)*np.min(tuning),\
+        p0=[np.max(tuning)+1,len(tuning)//2,1])
+    gaussian_y = gaussian(gaussian_x,paras[0],paras[1],paras[2])-np.min(tuning)*(-1)
+    return gaussian_x, gaussian_y, paras
+
+def average_H_within_location(H,input_locs,loc_set):
+
+    averaged_within_location=np.nanmean(H[:,input_locs==loc_set[0],:],axis=1,keepdims=True)
+
+    for loc in loc_set[1:]:
+        averaged_within_location = np.concatenate((averaged_within_location,np.nanmean(H[:,input_locs==loc,:],axis=1,keepdims=True)),axis=1)
+
+    return averaged_within_location
+
+def write_excel_xls(path, sheet_name, value):
+    import xlwt
+    index = len(value)
+    workbook = xlwt.Workbook()
+    sheet = workbook.add_sheet(sheet_name)
+    for i in range(0, index):
+        for j in range(0, len(value[i])):
+            sheet.write(i, j, value[i][j])
+    workbook.save(path)
+
+def split_test_train(x,y):
+
+    labels = sorted(set(y))
+
+    y_test = list()
+    y_train = list()
+
+    for label in labels:
+        x_temp = x[y==label,:]
+        trial_per_label = len(x_temp)
+        test_index = list(range(0,trial_per_label,4))
+        train_index = [i for i in range(trial_per_label) if i not in test_index]
+        if label == labels[0]:
+            x_train = x_temp[train_index,:]
+            x_test = x_temp[test_index,:]
+        else:
+            x_train = np.concatenate((x_train,x_temp[train_index,:]),axis=0)
+            x_test = np.concatenate((x_test,x_temp[test_index,:]),axis=0)
+
+        for i in range(len(train_index)):
+            y_train.append(label)
+        for i in range(len(test_index)):
+            y_test.append(label)
+
+
+    return x_train, x_test, np.array(y_train), np.array(y_test)
+
+def z_score_norm(ori_data):
+    ori_data=np.array(ori_data)
+    return (ori_data-np.nanmean(ori_data))/np.nanstd(ori_data)

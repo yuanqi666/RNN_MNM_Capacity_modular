@@ -6,27 +6,23 @@ import sys
 sys.path.append('.')
 from utils import tools
 
-def plot_growth_curve(hp,log,model_dir,smooth_growth=True,smooth_window=5,models_selected=None): # if you don't need smooth, set smooth_window to 0
+def plot_growth_curve(hp,log,model_dir,rules_plot=None,smooth_window=5,models_selected=None): # if you don't need to smooth, set smooth_window to 0
 
-    print('rule trained: ', hp['rules'])
-    print('minimum model index: ', log['trials'][0])
-    print('maximum model index: ', log['trials'][-1])
-    print('minimum step       : ', log['trials'][1])
-    print('total model number : ', len(log['trials']))
-
+    if rules_plot is None:
+        rules = hp['rules']
+    else:
+        rules = rules_plot
+    
     fig_pref = plt.figure(figsize=(12,9))
-    for rule in hp['rules']:
-        if smooth_growth:
-            growth = tools.smooth(log['perf_'+rule],smooth_window)
-        else:
-            growth = log['perf_'+rule]
+    for rule in rules:
+        growth = tools.smooth(log['perf_'+rule],smooth_window)
 
         #Plot Growth Curve
         plt.plot(log['trials'], growth, label = rule)
         
         #Mark out selected model indexes 
         if models_selected is not None:
-            models_selected_rule = tools.model_list_parser(hp, log, rule, models_selected,)
+            models_selected_rule = tools.model_list_parser(hp, log, rule, models_selected,)[rule]
             for m_c in [('early','green'),('mid','blue'),('mature','red')]:
                 plt.fill_between(log['trials'], growth, where=[i in models_selected_rule[m_c[0]] for i in log['trials']],\
                     facecolor=m_c[1],alpha=0.3)
@@ -45,14 +41,18 @@ def plot_growth_curve(hp,log,model_dir,smooth_growth=True,smooth_window=5,models
         for i in range(len(model_index_set)):
             plt.text(model_index_set[i],0,rule_set[i])
 
-    tools.mkdir_p('figure/figure_'+model_dir.rstrip('/').split('/')[-1]+'/')
+    save_dir = 'figure/'+model_dir.rstrip('/').split('/')[-1]+'/Growth_of_Performance/'
+    tools.mkdir_p(save_dir)
+    if rules_plot is None:
+        save_name = save_dir+'growth_of_performance'
+    else:
+        save_name = save_dir+'growth_of_performance_'+str(rules_plot)
 
     plt.xlabel("trial trained")
     plt.ylabel("perf")
     plt.ylim(bottom=-0.05)
     plt.legend(bbox_to_anchor=(1.05, 0), loc=3, borderaxespad=0)
     plt.title('Growth of Performance')
-    save_name = 'figure/figure_'+model_dir.rstrip('/').split('/')[-1]+'/growth_of_performance'
     plt.tight_layout()
     plt.savefig(save_name+'.png', transparent=False, bbox_inches='tight')
     plt.savefig(save_name+'.pdf', transparent=False, bbox_inches='tight')

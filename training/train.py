@@ -195,6 +195,7 @@ def do_eval(sess, model, log, rule_train):
 
 def train(model_dir,
           hp=None,
+          log=None,
           max_steps=1e7,
           display_step=500,
           ruleset='all_new',
@@ -219,6 +220,7 @@ def train(model_dir,
 
     Returns:
         model is stored at model_dir/trial_number/model.ckpt
+        trial_number is also referred as model_index in downstream analysis
         training configuration is stored at model_dir/hp.json
     """
 
@@ -263,8 +265,9 @@ def train(model_dir,
         print('{:20s} = '.format(key) + str(val))
 
     # Store results
-    log = defaultdict(list)
-    log['model_dir'] = model_dir
+    if log is None: #if log is not None, continue from where the training stopped last time
+        log = defaultdict(list)
+        log['model_dir'] = model_dir
     
     # Record time
     t_start = time.time()
@@ -316,7 +319,10 @@ def train(model_dir,
                 model.cost_reg += tf.nn.l2_loss((w - w_val) * w_mask)
             model.set_optimizer(var_list=var_list)
 
-        step = 0
+        if log['trials']:
+            step = int(log['trials'][-1]/hp['batch_size_train']) #continue from where the training stopped last time
+        else:
+            step = 0
         after_target_reached_step_count=0
         while 1:#step * hp['batch_size_train'] <= max_steps:
             try:
@@ -359,31 +365,3 @@ def train(model_dir,
                 break
 
         print("Optimization finished!")
-
-
-if __name__ == '__main__':
-    import argparse
-    import os
-    
-    parser = argparse.ArgumentParser(
-        formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-
-    parser.add_argument('--modeldir', type=str, default='../data/6tasks')#add by yichen
-    args = parser.parse_args()
-
-    os.environ["CUDA_VISIBLE_DEVICES"] = "0"
-    hp = {'activation': 'softplus',
-          'n_rnn': 256,
-          'learning_rate': 0.001,#add by yichen #default 0.001
-          'mix_rule': True,
-          'l1_h': 0.,
-          'use_separate_input': False}#modified by yichen
-    train(args.modeldir,
-        seed=0,
-        hp=hp,
-        ruleset='all_new',
-        rule_trains=['overlap','zero_gap','gap','odr','odrd','gap500',],
-        display_step=20)
-    #TODO: add function for starting training from the last checkpoint 
-    
-   
