@@ -31,9 +31,12 @@ def compute_single_H(hp, log, model_dir, rule, model_index, trial=None, task_mod
     task_info['epochs'] = trial.epochs
     task_info['input_loc'] = trial.location_info
     loc_set = dict()
-    for key, value in trial.location_info.items():
-        loc_set[key] = sorted(set(value))
-    task_info['loc_set'] = loc_set
+    try:
+        for key, value in trial.location_info.items():
+            loc_set[key] = sorted(set(value))
+        task_info['loc_set'] = loc_set
+    except:
+        pass
 
     perf = get_perf(y_hat, trial.y_loc)
     task_info['correct_trials'] = [x==1 for x in perf]

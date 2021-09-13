@@ -144,6 +144,7 @@ if __name__ == "__main__":
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
     parser.add_argument('--modeldir', type=str, default='data/MNM_color_6tasks_8per-ring')
+    #parser.add_argument('--modeldir', type=str, default='data/Capacity_6tasks_ei')
     parser.add_argument('--rule', type=str, default='MNM_color')
     #parser.add_argument('--epochs', nargs='+')
     args = parser.parse_args()
