@@ -33,8 +33,6 @@ rules_dict = \
     'MNM_color_6tasks':['MNM_color','overlap','zero_gap','gap','odr','odrd','gap500',],
 
     'MNM_color_6tasks_1240':['MNM_color_1240','overlap','zero_gap','gap','odr','odrd','gap500',],
-    
-    'MNM_strength':['MNM_strength',],
 
     'MNM_sequential':['MNM_sequential_phase1_m','MNM_sequential_phase1_nm','MNM_sequential_phase2','MNM_sequential_phase3','MNM_sequential_phase4'],
 
@@ -45,8 +43,30 @@ rules_dict = \
     'MNM_sequential_phase1_m','MNM_sequential_phase1_nm','MNM_sequential_phase2','MNM_sequential_phase3','MNM_sequential_phase4'],
 
     'Capacity_6tasks':['Capacity_color','overlap','zero_gap','gap','odr','odrd','gap500',],
+    'Capacity_clrwht_2stim_MNM_clr_6tasks':['Capacity_color_2_stims_white_stims','MNM_color','overlap','zero_gap','gap','odr','odrd','gap500',],
+    'Capacity_clrwht2ch_2stim_MNM_clr2ch_6tasks':['Capacity_color_2_stims_white_stims_2chan','MNM_color_2chan','overlap','zero_gap','gap','odr','odrd','gap500',],
+    'Capacity_clrwht_3stim_MNM_clr_6tasks':['Capacity_color_3_stims_white_stims','MNM_color','overlap','zero_gap','gap','odr','odrd','gap500',],
+    'Capacity_clrwht2ch_3stim_MNM_clr2ch_6tasks':['Capacity_color_3_stims_white_stims_2chan','MNM_color_2chan','overlap','zero_gap','gap','odr','odrd','gap500',],
+    'Capacity_clrwht_4stim_MNM_clr_6tasks':['Capacity_color_4_stims_white_stims','MNM_color','overlap','zero_gap','gap','odr','odrd','gap500',],
+    'Capacity_clrwht2ch_4stim_MNM_clr2ch_6tasks':['Capacity_color_4_stims_white_stims_2chan','MNM_color_2chan','overlap','zero_gap','gap','odr','odrd','gap500',],
+
+    'Capacity_clrwht_MNM_clr_6tasks_sequential':['overlap','zero_gap','gap','odr','odrd','gap500',\
+        'MNM_color','Capacity_color_2_stims_white_stims','Capacity_color_3_stims_white_stims','Capacity_color_4_stims_white_stims','Capacity_color_5_stims_white_stims'],
+
+    'Capacity_stim1-5_clrwht_6tasks_1s05s':['overlap','zero_gap','gap','odr','odrd','gap500',\
+        'Capacity_color_1_stims_white_stims_1s05s','Capacity_color_2_stims_white_stims_1s05s','Capacity_color_3_stims_white_stims_1s05s',\
+            'Capacity_color_4_stims_white_stims_1s05s','Capacity_color_5_stims_white_stims_1s05s'],
+    
+    'Capacity_stim1-5_clrwht_6tasks_1s05s_mx':['overlap','zero_gap','gap','odr','odrd','gap500',\
+        'Capacity_color_1_stims_wht_stims_1s05s_mx','Capacity_color_2_stims_wht_stims_1s05s_mx','Capacity_color_3_stims_wht_stims_1s05s_mx',\
+            'Capacity_color_4_stims_wht_stims_1s05s_mx','Capacity_color_5_stims_wht_stims_1s05s_mx'],
 
     'Capacity_mix_delay001001_6tasks':['Capacity_color_mix_uniform_001001','overlap','zero_gap','gap','odr','odrd','gap500',],
+    'Capacity_mix_delay001005_6tasks':['Capacity_color_mix_uniform_001005','overlap','zero_gap','gap','odr','odrd','gap500',],
+    'Capacity_MNM_6tasks':['Capacity_color_mix_uniform_001005','Capacity_color','MNM_color','overlap','zero_gap','gap','odr','odrd','gap500',],
+
+    'Capacity_stgfc_MNM_stgfc_6tasks':['Capacity_strength_fix_choice','MNM_strength_fix_choice','overlap','zero_gap','gap','odr','odrd','gap500',],
+    'Capacity_stg_MNM_stg_6tasks':['Capacity_strength','MNM_strength','overlap','zero_gap','gap','odr','odrd','gap500',],
     }
 
 # Store indices of rules
@@ -119,7 +139,7 @@ class Trial(object):
             var = [var] * self.batch_size
         return var
 
-    def add(self, loc_type, locs=None, ons=None, offs=None, strengths=1, mods=None):
+    def add(self, loc_type, locs=None, ons=None, offs=None, strengths=1, mods=None, add_mode='add'):
         """Add an input or stimulus output.
 
         Args:
@@ -131,6 +151,8 @@ class Trial(object):
             mods: int or list, modalities of input or target output
             mods can also be tuple for three modality/channel (RGB) encoding. In this way, strengths will be ignored in type stim, for the 
             elements in the tuple will control the strength in corresponding channel (element0:RED, element1:GREEN, element2:BLUE)
+            add_mode: the mode that overlay multiple stimulus/choice on one ring. default is 'add', which will add them together. Or you can
+            choose 'maximum' wich will use the larger value on each point instead of adding them.
         """
 
         ons = self.expand(ons)
@@ -142,38 +164,69 @@ class Trial(object):
             if loc_type == 'fix_in':
                 self.x[ons[i]: offs[i], i, 0] = 1
             elif loc_type == 'stim': #modified by yichen
+                if np.isnan(locs[i]):
+                    continue
                 # Assuming that mods[i] starts from 1
-                if not isinstance(mods[i], tuple): 
-                    self.x[ons[i]: offs[i], i, 1+(mods[i]-1)*self.n_eachring:1+mods[i]*self.n_eachring] \
-                        += self.add_x_loc(locs[i])*strengths[i]
+                if not isinstance(mods[i], tuple):
+                    if add_mode == 'add':
+                        self.x[ons[i]: offs[i], i, 1+(mods[i]-1)*self.n_eachring:1+mods[i]*self.n_eachring] \
+                            += self.add_x_loc(locs[i])*strengths[i]
+                    elif add_mode == 'maximum':
+                        temp_x = self.x[ons[i]: offs[i], i, 1+(mods[i]-1)*self.n_eachring:1+mods[i]*self.n_eachring]
+                        self.x[ons[i]: offs[i], i, 1+(mods[i]-1)*self.n_eachring:1+mods[i]*self.n_eachring] \
+                            = np.maximum(temp_x,self.add_x_loc(locs[i])*strengths[i])
+                    else:
+                        raise ValueError('Unknown add mode: ' + str(add_mode))
                 else:
                     for color in range(len(mods[i])): #0:Red 1:Green 2:Blue
-                        self.x[ons[i]: offs[i], i, 1+color*self.n_eachring:1+(color+1)*self.n_eachring] \
-                            += self.add_x_loc(locs[i])*mods[i][color]
+                        if add_mode == 'add':
+                            self.x[ons[i]: offs[i], i, 1+color*self.n_eachring:1+(color+1)*self.n_eachring] \
+                                += self.add_x_loc(locs[i])*mods[i][color]
+                        elif add_mode == 'maximum':
+                            temp_x = self.x[ons[i]: offs[i], i, 1+color*self.n_eachring:1+(color+1)*self.n_eachring]
+                            self.x[ons[i]: offs[i], i, 1+color*self.n_eachring:1+(color+1)*self.n_eachring] \
+                                = np.maximum(temp_x,self.add_x_loc(locs[i])*mods[i][color])
+                        else:
+                            raise ValueError('Unknown add mode: ' + str(add_mode))
 
                 #self.input_loc.append(self.add_x_loc(locs[i]))#add by yichen
             #########################add by yichen###############################################
-            elif loc_type == 'distract':
-                # Assuming that mods[i] starts from 1
-                if not isinstance(mods[i], tuple):
-                    self.x[ons[i]: offs[i], i, 1+(mods[i]-1)*self.n_eachring:1+mods[i]*self.n_eachring] \
-                        += self.add_x_loc(locs[i])*strengths[i]
-                else:
-                    for color in range(len(mods[i])): #0:Red 1:Green 2:Blue
-                        self.x[ons[i]: offs[i], i, 1+color*self.n_eachring:1+(color+1)*self.n_eachring] \
-                            += self.add_x_loc(locs[i])*mods[i][color]
-                #self.distract_loc.append(self.add_x_loc(locs[i]))
+            # elif loc_type == 'distract':
+            #     # Assuming that mods[i] starts from 1
+            #     if not isinstance(mods[i], tuple):
+            #         self.x[ons[i]: offs[i], i, 1+(mods[i]-1)*self.n_eachring:1+mods[i]*self.n_eachring] \
+            #             += self.add_x_loc(locs[i])*strengths[i]
+            #     else:
+            #         for color in range(len(mods[i])): #0:Red 1:Green 2:Blue
+            #             self.x[ons[i]: offs[i], i, 1+color*self.n_eachring:1+(color+1)*self.n_eachring] \
+            #                 += self.add_x_loc(locs[i])*mods[i][color]
+            #     #self.distract_loc.append(self.add_x_loc(locs[i]))
             elif loc_type == 'choice':
                 # Assuming that mods[i] starts from 1
                 if not isinstance(mods[i], tuple):
                     choices = self.add_choice_loc(locs[i])*strengths[i]
-                    self.x[ons[i]: offs[i], i, 1+(mods[i]-1)*self.n_eachring:1+mods[i]*self.n_eachring] \
-                        += choices
+                    if add_mode == 'add':
+                        self.x[ons[i]: offs[i], i, 1+(mods[i]-1)*self.n_eachring:1+mods[i]*self.n_eachring] \
+                            += choices
+                    elif add_mode == 'maximum':
+                        temp_x = self.x[ons[i]: offs[i], i, 1+(mods[i]-1)*self.n_eachring:1+mods[i]*self.n_eachring]
+                        self.x[ons[i]: offs[i], i, 1+(mods[i]-1)*self.n_eachring:1+mods[i]*self.n_eachring] \
+                            = np.maximum(temp_x,choices)
+                    else:
+                        raise ValueError('Unknown add mode: ' + str(add_mode))
+                    
                 else:
                     for color in range(len(mods[i])): #0:Red 1:Green 2:Blue
                         choices = self.add_choice_loc(locs[i])*mods[i][color]
-                        self.x[ons[i]: offs[i], i, 1+color*self.n_eachring:1+(color+1)*self.n_eachring] \
-                            += choices
+                        if add_mode == 'add':
+                            self.x[ons[i]: offs[i], i, 1+color*self.n_eachring:1+(color+1)*self.n_eachring] \
+                                += choices
+                        elif add_mode == 'maximum':
+                            temp_x = self.x[ons[i]: offs[i], i, 1+color*self.n_eachring:1+(color+1)*self.n_eachring]
+                            self.x[ons[i]: offs[i], i, 1+color*self.n_eachring:1+(color+1)*self.n_eachring] \
+                                = np.maximum(temp_x,choices)
+                        else:
+                            raise ValueError('Unknown add mode: ' + str(add_mode))
 
             #########################add by yichen###############################################
             elif loc_type == 'fix_out':
@@ -507,7 +560,7 @@ def odrd_(config, mode, **kwargs):
     trial = Trial(config, tdim, batch_size)
     trial.add('fix_in', offs=fix_offs)
     trial.add('stim', stim_locs, ons=stim_ons, offs=stim_offs, mods=stim_mod)
-    trial.add('distract', distract_locs, ons=distract_ons, offs=distract_offs, mods=stim_mod)
+    trial.add('stim', distract_locs, ons=distract_ons, offs=distract_offs, mods=stim_mod)
     trial.add('fix_out', offs=fix_offs)
     trial.add('out', response_locs, ons=fix_offs)
     trial.add_c_mask(pre_offs=fix_offs, post_ons=check_ons)
@@ -871,7 +924,7 @@ def match_or_non_easy(config, mode, **kwargs):
 def match_or_non_passive(config, mode, **kwargs):
     return match_or_non_(config, mode, easy_task=False, passive=True, **kwargs)
 
-def MNM_color_(config, mode, delaytime, **kwargs):
+def MNM_color_(config, mode, delaytime, color_channel_num=3, **kwargs):
     #                delay1    delay2
     # ----------^^^^^-----^^^^^-----^^^^^
     #           stim1     stim2     choice
@@ -945,10 +998,10 @@ def MNM_color_(config, mode, delaytime, **kwargs):
     trial = Trial(config, tdim, batch_size)
 
     trial.add('fix_in', offs=fix_offs)
-    trial.add('stim', stim1_locs, ons=stim1_ons, offs=stim1_offs, mods=(1,1,1))#RGB(white)
-    trial.add('stim', stim2_locs, ons=stim2_ons, offs=stim2_offs, mods=(1,1,1))#RGB(white)
-    trial.add('choice', M_choice_loc, ons=choice_ons, mods=(0,1,0))#Green
-    trial.add('choice', NM_choice_loc, ons=choice_ons, mods=(0,0,1))#Blue
+    trial.add('stim', stim1_locs, ons=stim1_ons, offs=stim1_offs, mods=(1,)*color_channel_num)#RGB(white)
+    trial.add('stim', stim2_locs, ons=stim2_ons, offs=stim2_offs, mods=(1,)*color_channel_num)#RGB(white)
+    trial.add('choice', M_choice_loc, ons=choice_ons, mods=(1,0))#Red
+    trial.add('choice', NM_choice_loc, ons=choice_ons, mods=(0,1))#Green
 
     trial.add('fix_out', offs=fix_offs)
     trial.add('out', response_locs, ons=fix_offs)
@@ -974,10 +1027,13 @@ def MNM_color_(config, mode, delaytime, **kwargs):
 def MNM_color(config, mode, **kwargs): #0.5s delay
     return MNM_color_(config, mode, delaytime=500, **kwargs)
 
+def MNM_color_2chan(config, mode, **kwargs): #0.5s delay
+    return MNM_color_(config, mode, delaytime=500, color_channel_num=2,**kwargs)
+
 def MNM_color_1240(config, mode, **kwargs): #1.24s delay
     return MNM_color_(config, mode, delaytime=1240, **kwargs)
 
-def MNM_strength_(config, mode, **kwargs):
+def MNM_strength_(config, mode,fix_choice_loc=True, **kwargs):
     #                delay1    delay2
     # ----------^^^^^-----^^^^^-----^^^^^
     #           stim1     stim2     choice
@@ -1041,9 +1097,14 @@ def MNM_strength_(config, mode, **kwargs):
 
     check_ons= fix_offs + int(100/dt)
 
-    # Match and Non-Match choice location
-    M_choice_loc = np.random.randint(config['n_eachring'],size=batch_size)*(2*np.pi/config['n_eachring'])
-    NM_choice_loc = (M_choice_loc+np.pi)%(2*np.pi)
+    if fix_choice_loc:
+        # Match and Non-Match choice location
+        M_choice_loc = np.zeros(batch_size)
+        NM_choice_loc = np.ones(batch_size)*np.pi
+    else:
+        # Match and Non-Match choice location
+        M_choice_loc = np.random.randint(config['n_eachring'],size=batch_size)*(2*np.pi/config['n_eachring'])
+        NM_choice_loc = (M_choice_loc+np.pi)%(2*np.pi)
 
     # Response locations
     response_locs = (M_choice_loc+match_or_not*np.pi)%(2*np.pi)
@@ -1053,8 +1114,8 @@ def MNM_strength_(config, mode, **kwargs):
     trial.add('fix_in', offs=fix_offs)
     trial.add('stim', stim1_locs, ons=stim1_ons, offs=stim1_offs, mods=1)
     trial.add('stim', stim2_locs, ons=stim2_ons, offs=stim2_offs, mods=1)
-    trial.add('choice', M_choice_loc, ons=choice_ons, mods=1, strengths=1)
-    trial.add('choice', NM_choice_loc, ons=choice_ons, mods=1, strengths=0.5)
+    trial.add('choice', M_choice_loc, ons=choice_ons, mods=2, strengths=1)
+    trial.add('choice', NM_choice_loc, ons=choice_ons, mods=2, strengths=0.5)
 
     trial.add('fix_out', offs=fix_offs)
     trial.add('out', response_locs, ons=fix_offs)
@@ -1077,10 +1138,13 @@ def MNM_strength_(config, mode, **kwargs):
 
     return trial
 
-def MNM_strength(config, mode, **kwargs):
+def MNM_strength_fix_choice(config, mode, **kwargs):
     return MNM_strength_(config, mode, **kwargs)
 
-def MNM_sequential_phase_1_(config, mode, MorNM, **kwargs):
+def MNM_strength(config, mode, **kwargs):
+    return MNM_strength_(config, mode, fix_choice_loc=False, **kwargs)
+
+def MNM_sequential_phase_1_(config, mode, MorNM, color_channel_num=3, **kwargs):
     #                delay1    delay2
     # ----------^^^^^-----^^^^^-----^^^^^
     #           stim1     stim2     choice
@@ -1154,10 +1218,10 @@ def MNM_sequential_phase_1_(config, mode, MorNM, **kwargs):
     trial = Trial(config, tdim, batch_size)
 
     trial.add('fix_in', offs=fix_offs)
-    trial.add('stim', stim1_locs, ons=stim1_ons, offs=stim1_offs, mods=(1,1,1))#RGB(white)
-    trial.add('stim', stim2_locs, ons=stim2_ons, offs=stim2_offs, mods=(1,1,1))#RGB(white)
-    trial.add('choice', M_choice_loc, ons=choice_ons, mods=(0,1,0))#Green
-    trial.add('choice', NM_choice_loc, ons=choice_ons, mods=(0,0,1))#Blue
+    trial.add('stim', stim1_locs, ons=stim1_ons, offs=stim1_offs, mods=(1,)*color_channel_num)#RGB(white)
+    trial.add('stim', stim2_locs, ons=stim2_ons, offs=stim2_offs, mods=(1,)*color_channel_num)#RGB(white)
+    trial.add('choice', M_choice_loc, ons=choice_ons, mods=(1,0))#Red
+    trial.add('choice', NM_choice_loc, ons=choice_ons, mods=(0,1))#Green
 
     trial.add('fix_out', offs=fix_offs)
     trial.add('out', response_locs, ons=fix_offs)
@@ -1180,7 +1244,7 @@ def MNM_sequential_phase_1_(config, mode, MorNM, **kwargs):
 
     return trial
 
-def MNM_sequential_phase_2_(config, mode, **kwargs): #def MNM_sequential_phase_1_2_(config, mode, phase, **kwargs):
+def MNM_sequential_phase_2_(config, mode, color_channel_num=3, **kwargs): #def MNM_sequential_phase_1_2_(config, mode, phase, **kwargs):
     #                delay1    delay2
     # ----------^^^^^-----^^^^^-----^^^^^
     #           stim1     stim2     choice
@@ -1254,10 +1318,10 @@ def MNM_sequential_phase_2_(config, mode, **kwargs): #def MNM_sequential_phase_1
     trial = Trial(config, tdim, batch_size)
 
     trial.add('fix_in', offs=fix_offs)
-    trial.add('stim', stim1_locs, ons=stim1_ons, offs=stim1_offs, mods=(1,1,1))#RGB(white)
-    trial.add('stim', stim2_locs, ons=stim2_ons, offs=stim2_offs, mods=(1,1,1))#RGB(white)
-    trial.add('choice', M_choice_loc, ons=choice_ons, mods=(0,1,0))#Green
-    trial.add('choice', NM_choice_loc, ons=choice_ons, mods=(0,0,1))#Blue
+    trial.add('stim', stim1_locs, ons=stim1_ons, offs=stim1_offs, mods=(1,)*color_channel_num)#RGB(white)
+    trial.add('stim', stim2_locs, ons=stim2_ons, offs=stim2_offs, mods=(1,)*color_channel_num)#RGB(white)
+    trial.add('choice', M_choice_loc, ons=choice_ons, mods=(1,0))#Red
+    trial.add('choice', NM_choice_loc, ons=choice_ons, mods=(0,1))#Green
 
     trial.add('fix_out', offs=fix_offs)
     trial.add('out', response_locs, ons=fix_offs)
@@ -1280,7 +1344,7 @@ def MNM_sequential_phase_2_(config, mode, **kwargs): #def MNM_sequential_phase_1
 
     return trial
 
-def MNM_sequential_phase_3_4_(config, mode, delaytime, **kwargs):
+def MNM_sequential_phase_3_4_(config, mode, delaytime, color_channel_num=3, **kwargs):
     #                delay1    delay2
     # ----------^^^^^-----^^^^^-----^^^^^
     #           stim1     stim2     choice
@@ -1351,10 +1415,10 @@ def MNM_sequential_phase_3_4_(config, mode, delaytime, **kwargs):
     trial = Trial(config, tdim, batch_size)
 
     trial.add('fix_in', offs=fix_offs)
-    trial.add('stim', stim1_locs, ons=stim1_ons, offs=stim1_offs, mods=(1,1,1))#RGB(white)
-    trial.add('stim', stim2_locs, ons=stim2_ons, offs=stim2_offs, mods=(1,1,1))#RGB(white)
-    trial.add('choice', M_choice_loc, ons=choice_ons, mods=(0,1,0))#Green
-    trial.add('choice', NM_choice_loc, ons=choice_ons, mods=(0,0,1))#Blue
+    trial.add('stim', stim1_locs, ons=stim1_ons, offs=stim1_offs, mods=(1,)*color_channel_num)#RGB(white)
+    trial.add('stim', stim2_locs, ons=stim2_ons, offs=stim2_offs, mods=(1,)*color_channel_num)#RGB(white)
+    trial.add('choice', M_choice_loc, ons=choice_ons, mods=(1,0))#Red
+    trial.add('choice', NM_choice_loc, ons=choice_ons, mods=(0,1))#Green
 
     trial.add('fix_out', offs=fix_offs)
     trial.add('out', response_locs, ons=fix_offs)
@@ -1388,7 +1452,25 @@ def MNM_sequential_phase3(config, mode, **kwargs):
 def MNM_sequential_phase4(config, mode, **kwargs):
     return MNM_sequential_phase_3_4_(config, mode, 1500, **kwargs)
 
-def Capacity_color_(config, mode, delaytime, stim_per_epoch,**kwargs):
+def generate_capacity_test_stim(sub_sample_num,stim_per_epoch,n_eachring,step,rng,trials_per_cond=16):
+    import itertools as it
+    stim1s = list()
+    possible_conditions = list()
+    for e in it.combinations(list(range(sub_sample_num)), stim_per_epoch):
+        possible_conditions.append(e)
+    
+    random_shift = rng.randint(0,stim_per_epoch,len(possible_conditions))
+    for cond, shift in zip(possible_conditions,random_shift):
+        stim1s += [ [cond[(i+shift)%stim_per_epoch] for i in range(stim_per_epoch)] ] * trials_per_cond
+
+    stim1s = np.array(stim1s).T * step * 2 * np.pi / n_eachring
+
+    match_or_not = np.unravel_index(range(len(stim1s[0])),(len(possible_conditions)*2,trials_per_cond//2))[0]%2
+
+    return stim1s,match_or_not
+
+def Capacity_color_(config, mode, delaytime, stim_per_epoch, \
+    white_stims=False, color_channel_num=3, delaytime2=None , add_mode='add', **kwargs):
     #                delay1    delay2
     # ----------^^^^^-----^^^^^-----^^^^^
     #           stim1     stim2     choice
@@ -1397,13 +1479,16 @@ def Capacity_color_(config, mode, delaytime, stim_per_epoch,**kwargs):
     #
     dt = config['dt']
     rng = config['rng']
+    if delaytime2 is None:
+        delaytime2 = delaytime
+
     if mode == 'random': # Randomly generate parameters
         #Stimuli
         batch_size = kwargs['batch_size']
         stim1s = rng.rand(stim_per_epoch,batch_size)*2*np.pi
         devi_dist = np.zeros_like(stim1s)
         match_or_not = rng.randint(0,2,batch_size) #an array consists of 0&1 with the size of stim1_locs. 0 is match 1 is non-match
-        devi_dist[0,:] = rng.randint(1,config['n_eachring'])*(2*np.pi/config['n_eachring'])*match_or_not
+        devi_dist[0,:] = rng.randint(1,config['n_eachring'],size=batch_size)*(2*np.pi/config['n_eachring'])*match_or_not
         stim2s = (stim1s + devi_dist)%(2*np.pi)
 
 
@@ -1414,23 +1499,23 @@ def Capacity_color_(config, mode, delaytime, stim_per_epoch,**kwargs):
         stim2_ons= stim1_offs+int(delaytime/dt) #delay
         stim2_offs= stim2_ons+int(500/dt) # last for 0.5s
 
-        choice_ons= stim2_offs+int(delaytime/dt) #delay
+        choice_ons= stim2_offs+int(delaytime2/dt) #delay
 
         fix_offs = choice_ons
 
         tdim     = fix_offs + int(500/dt)
 
     elif mode == 'test':
-        #Stimuli
-        n_stim_loc, _ = batch_shape = config['n_eachring'], 16
-        batch_size = np.prod(batch_shape)
-        ind_stim_loc, _ = np.unravel_index(range(batch_size),batch_shape)
-
-        stim1s = rng.rand(stim_per_epoch,batch_size)*2*np.pi
-
-        stim1s[0,:]  = 2*np.pi*ind_stim_loc/n_stim_loc
+        for i in range(9,4,-1): #9~5
+            if config['n_eachring']%i == 0 and i > stim_per_epoch:
+                step = config['n_eachring']//i
+                sub_sample_num = i
+                break
         
-        match_or_not = np.unravel_index(range(batch_size),(config['n_eachring']*2,8))[0]%2
+        #Stimuli
+        stim1s, match_or_not = generate_capacity_test_stim(sub_sample_num,stim_per_epoch,config['n_eachring'],step,rng)
+        batch_size = len(stim1s[0])
+        
         devi_dist = np.zeros_like(stim1s)
         devi_dist[0,:] = match_or_not*np.pi
 
@@ -1443,7 +1528,83 @@ def Capacity_color_(config, mode, delaytime, stim_per_epoch,**kwargs):
         stim2_ons= stim1_offs+int(delaytime/dt) #delay
         stim2_offs= stim2_ons+int(500/dt) # last for 0.5s
 
-        choice_ons= stim2_offs+int(delaytime/dt) #delay
+        choice_ons= stim2_offs+int(delaytime2/dt) #delay
+
+        fix_offs = choice_ons
+        
+        tdim     = fix_offs + int(500/dt)
+
+    elif mode == 'multistim_withinRF':
+        batch_shape = config['n_eachring'], 32
+        batch_size = np.prod(batch_shape)
+        match_or_not = np.unravel_index(range(batch_size),(config['n_eachring']*4,8))[0]%2
+        multistim_mask = np.unravel_index(range(batch_size),(config['n_eachring']*2,16))[0]%2
+
+        stim1s = np.full((stim_per_epoch,batch_size), np.nan)
+        stim1s[0] = np.unravel_index(range(batch_size),(config['n_eachring'],32))[0]
+
+        devi_dist = np.zeros_like(stim1s)
+        devi_dist[0,:] = match_or_not*np.pi
+
+        for ist in range(1,stim_per_epoch):
+            shift_dist = (ist+1)//2
+            shift_direc = (ist+1)%2
+
+            for i,mask in enumerate(multistim_mask):
+                if mask:
+                    if i%2 == shift_direc:
+                        stim1s[ist,i] = (stim1s[0,i]+shift_dist)%config['n_eachring']
+                    else:
+                        stim1s[ist,i] = (stim1s[0,i]-shift_dist+config['n_eachring'])%config['n_eachring']
+
+        stim1s = stim1s * 2 * np.pi / config['n_eachring']
+        stim2s = (stim1s + devi_dist)%(2*np.pi)
+
+        #Timeline
+        stim1_ons  = int(1000/dt)
+        stim1_offs = stim1_ons + int(500/dt) #last for 0.5s
+
+        stim2_ons= stim1_offs+int(delaytime/dt) #delay
+        stim2_offs= stim2_ons+int(500/dt) # last for 0.5s
+
+        choice_ons= stim2_offs+int(delaytime2/dt) #delay
+
+        fix_offs = choice_ons
+        
+        tdim     = fix_offs + int(500/dt)
+
+    elif mode == 'move_one_loc':
+        for i in range(9,4,-1): #9~5
+            if config['n_eachring']%i == 0 and i > stim_per_epoch:
+                step = config['n_eachring']//i
+                sub_sample_num = i
+                break
+        
+        #Stimuli
+        trial_per_cond = 8+4*stim_per_epoch
+        stim1s, _ = generate_capacity_test_stim(sub_sample_num,stim_per_epoch,config['n_eachring'],step,rng,trial_per_cond)
+
+        batch_size = len(stim1s[0])
+        cond_num = int(batch_size/(trial_per_cond))
+        match_or_not = np.array(([0,]*8+[1,]*4*stim_per_epoch)*cond_num)
+        
+        devi_dist = np.zeros_like(stim1s)
+        for nst in range(stim_per_epoch):
+            for n_cond in range(cond_num):
+                shift = n_cond*trial_per_cond+4*nst
+                devi_dist[nst,shift:shift+2] = 2*np.pi/config['n_eachring']
+                devi_dist[nst,shift+2:shift+4] = 2*np.pi*(1-1/config['n_eachring'])
+
+        stim2s = (stim1s + devi_dist)%(2*np.pi)
+
+        #Timeline
+        stim1_ons  = int(1000/dt)
+        stim1_offs = stim1_ons + int(500/dt) #last for 0.5s
+
+        stim2_ons= stim1_offs+int(delaytime/dt) #delay
+        stim2_offs= stim2_ons+int(500/dt) # last for 0.5s
+
+        choice_ons= stim2_offs+int(delaytime2/dt) #delay
 
         fix_offs = choice_ons
         
@@ -1461,32 +1622,35 @@ def Capacity_color_(config, mode, delaytime, stim_per_epoch,**kwargs):
     # Response locations
     response_locs = (M_choice_loc+match_or_not*np.pi)%(2*np.pi)
 
-    stim_ring_indexes = rng.randint(stim_per_epoch, size=batch_size) #which ring will the changable stimulus be
-    stim_mods_ = np.zeros((batch_size,stim_per_epoch),dtype=int)
-    for tn, idx in enumerate(stim_ring_indexes):
-        stim_mods_[tn,idx] = 1
-    stim_mods = [tuple(i) for i in stim_mods_]
-
     trial = Trial(config, tdim, batch_size)
 
     trial.add('fix_in', offs=fix_offs)
-    #trial.add('stim', stim1s[0], ons=stim1_ons, offs=stim1_offs, mods=(1,1,1))#RGB(white)
-    #trial.add('stim', stim2s[0], ons=stim2_ons, offs=stim2_offs, mods=(1,1,1))#RGB(white)
-    trial.add('stim', stim1s[0], ons=stim1_ons, offs=stim1_offs, mods=stim_mods)
-    trial.add('stim', stim2s[0], ons=stim2_ons, offs=stim2_offs, mods=stim_mods)
+    if not white_stims:
+        stim_ring_indexes = rng.randint(stim_per_epoch, size=batch_size) #which ring will the changable stimulus be
+        stim_mods_ = np.zeros((batch_size,stim_per_epoch),dtype=int)
+        for tn, idx in enumerate(stim_ring_indexes):
+            stim_mods_[tn,idx] = 1
+        stim_mods = [tuple(i) for i in stim_mods_]
+        trial.add('stim', stim1s[0], ons=stim1_ons, offs=stim1_offs, mods=stim_mods,add_mode=add_mode)
+        trial.add('stim', stim2s[0], ons=stim2_ons, offs=stim2_offs, mods=stim_mods,add_mode=add_mode)
+    else:
+        trial.add('stim', stim1s[0], ons=stim1_ons, offs=stim1_offs, mods=(1,)*color_channel_num,add_mode=add_mode)#RGB(white)
+        trial.add('stim', stim2s[0], ons=stim2_ons, offs=stim2_offs, mods=(1,)*color_channel_num,add_mode=add_mode)#RGB(white)
     for i in range(1,stim_per_epoch):
-        #trial.add('distract', stim1s[i], ons=stim1_ons, offs=stim1_offs, mods=(1,1,1))#RGB(white)
-        #trial.add('distract', stim2s[i], ons=stim2_ons, offs=stim2_offs, mods=(1,1,1))#RGB(white)
-        distract_ring_indexes = (stim_ring_indexes+i)%stim_per_epoch
-        distr_mods_ = np.zeros((batch_size,stim_per_epoch),dtype=int)
-        for tn, idx in enumerate(distract_ring_indexes):
-            distr_mods_[tn,idx] = 1
-        distr_mods = [tuple(i) for i in distr_mods_]
-        trial.add('distract', stim1s[i], ons=stim1_ons, offs=stim1_offs, mods=distr_mods)#RGB(white)
-        trial.add('distract', stim2s[i], ons=stim2_ons, offs=stim2_offs, mods=distr_mods)#RGB(white)
+        if not white_stims:
+            distract_ring_indexes = (stim_ring_indexes+i)%stim_per_epoch
+            distr_mods_ = np.zeros((batch_size,stim_per_epoch),dtype=int)
+            for tn, idx in enumerate(distract_ring_indexes):
+                distr_mods_[tn,idx] = 1
+            distr_mods = [tuple(i) for i in distr_mods_]
+            trial.add('stim', stim1s[i], ons=stim1_ons, offs=stim1_offs, mods=distr_mods,add_mode=add_mode)
+            trial.add('stim', stim2s[i], ons=stim2_ons, offs=stim2_offs, mods=distr_mods,add_mode=add_mode)
+        else:
+            trial.add('stim', stim1s[i], ons=stim1_ons, offs=stim1_offs, mods=(1,)*color_channel_num,add_mode=add_mode)#RGB(white)
+            trial.add('stim', stim2s[i], ons=stim2_ons, offs=stim2_offs, mods=(1,)*color_channel_num,add_mode=add_mode)#RGB(white)
 
-    trial.add('choice', M_choice_loc, ons=choice_ons, mods=(0,1,0))#Green
-    trial.add('choice', NM_choice_loc, ons=choice_ons, mods=(0,0,1))#Blue
+    trial.add('choice', M_choice_loc, ons=choice_ons, mods=(1,0),add_mode=add_mode)#Red
+    trial.add('choice', NM_choice_loc, ons=choice_ons, mods=(0,1),add_mode=add_mode)#Green
 
     trial.add('fix_out', offs=fix_offs)
     trial.add('out', response_locs, ons=fix_offs)
@@ -1500,11 +1664,21 @@ def Capacity_color_(config, mode, delaytime, stim_per_epoch,**kwargs):
                    'delay2'    : (stim2_offs, choice_ons),
                    'go1'       : (fix_offs, None)} #go period is also the choice display period
 
-    trial.location_info = { 'fix1':[None]*len(stim1s[0]),
-                            'stim1':stim1s[0],
-                            'delay1':stim1s[0],
-                            'stim2':stim2s[0],
-                            'delay2':stim2s[0],
+    if mode == 'test' or mode == 'move_one_loc':
+        stim1_conditions = (stim1s.T/(2 * np.pi)*config['n_eachring']).astype(np.int32)
+        stim1_conditions = np.array([int(''.join([str(s) for s in s1])) for s1 in stim1_conditions])
+        stim2_conditions = (stim2s.T/(2 * np.pi)*config['n_eachring']).astype(np.int32)
+        stim2_conditions = np.array([int(''.join([str(s) for s in s2])) for s2 in stim2_conditions])
+
+    else:
+        stim1_conditions = stim1s
+        stim2_conditions = stim2s
+
+    trial.location_info = { 'fix1':[None]*batch_size,
+                            'stim1':stim1_conditions,
+                            'delay1':stim1_conditions,
+                            'stim2':stim2_conditions,
+                            'delay2':stim2_conditions,
                             'go1':response_locs,}
 
     #TODO:add task info here
@@ -1514,7 +1688,61 @@ def Capacity_color_(config, mode, delaytime, stim_per_epoch,**kwargs):
 def Capacity_color(config, mode, **kwargs):
     return Capacity_color_(config, mode, 500, 3, **kwargs)
 
-def Capacity_color_mix_uniform_(config, mode, stim_per_epoch, delay_time_bound=(0,1000), delay_step=None,**kwargs):
+def Capacity_color_2_stims_white_stims(config, mode, **kwargs):
+    return Capacity_color_(config, mode, 500, 2, white_stims=True ,**kwargs)
+
+def Capacity_color_2_stims_white_stims_2chan(config, mode, **kwargs):
+    return Capacity_color_(config, mode, 500, 2, white_stims=True ,color_channel_num=2 ,**kwargs)
+
+def Capacity_color_3_stims_white_stims(config, mode, **kwargs):
+    return Capacity_color_(config, mode, 500, 3, white_stims=True ,**kwargs)
+
+def Capacity_color_3_stims_white_stims_2chan(config, mode, **kwargs):
+    return Capacity_color_(config, mode, 500, 3, white_stims=True ,color_channel_num=2 ,**kwargs)
+
+def Capacity_color_4_stims_white_stims(config, mode, **kwargs):
+    return Capacity_color_(config, mode, 500, 4, white_stims=True ,**kwargs)
+
+def Capacity_color_4_stims_white_stims_2chan(config, mode, **kwargs):
+    return Capacity_color_(config, mode, 500, 4, white_stims=True ,color_channel_num=2 ,**kwargs)
+
+def Capacity_color_5_stims_white_stims(config, mode, **kwargs):
+    return Capacity_color_(config, mode, 500, 5, white_stims=True ,**kwargs)
+
+#####################################################################################################
+def Capacity_color_1_stims_white_stims_1s05s(config, mode, **kwargs):
+    return Capacity_color_(config, mode, 1000, 1,delaytime2=500, white_stims=True ,**kwargs)
+
+def Capacity_color_2_stims_white_stims_1s05s(config, mode, **kwargs):
+    return Capacity_color_(config, mode, 1000, 2,delaytime2=500, white_stims=True ,**kwargs)
+
+def Capacity_color_3_stims_white_stims_1s05s(config, mode, **kwargs):
+    return Capacity_color_(config, mode, 1000, 3,delaytime2=500, white_stims=True ,**kwargs)
+
+def Capacity_color_4_stims_white_stims_1s05s(config, mode, **kwargs):
+    return Capacity_color_(config, mode, 1000, 4,delaytime2=500, white_stims=True ,**kwargs)
+
+def Capacity_color_5_stims_white_stims_1s05s(config, mode, **kwargs):
+    return Capacity_color_(config, mode, 1000, 5,delaytime2=500, white_stims=True ,**kwargs)
+
+####################################################################################################
+
+def Capacity_color_1_stims_wht_stims_1s05s_mx(config, mode, **kwargs):
+    return Capacity_color_(config, mode, 1000, 1,delaytime2=500, white_stims=True ,add_mode='maximum', **kwargs)
+
+def Capacity_color_2_stims_wht_stims_1s05s_mx(config, mode, **kwargs):
+    return Capacity_color_(config, mode, 1000, 2,delaytime2=500, white_stims=True ,add_mode='maximum',**kwargs)
+
+def Capacity_color_3_stims_wht_stims_1s05s_mx(config, mode, **kwargs):
+    return Capacity_color_(config, mode, 1000, 3,delaytime2=500, white_stims=True ,add_mode='maximum',**kwargs)
+
+def Capacity_color_4_stims_wht_stims_1s05s_mx(config, mode, **kwargs):
+    return Capacity_color_(config, mode, 1000, 4,delaytime2=500, white_stims=True ,add_mode='maximum',**kwargs)
+
+def Capacity_color_5_stims_wht_stims_1s05s_mx(config, mode, **kwargs):
+    return Capacity_color_(config, mode, 1000, 5,delaytime2=500, white_stims=True ,add_mode='maximum',**kwargs)
+
+def Capacity_color_mix_uniform_(config, mode, stim_per_epoch, delay_time_bound=(0,1000), delay_step=None, white_stims=False, color_channel_num=3, **kwargs):
     #                delay1    delay2
     # ----------^^^^^-----^^^^^-----^^^^^
     #           stim1     stim2     choice
@@ -1529,7 +1757,7 @@ def Capacity_color_mix_uniform_(config, mode, stim_per_epoch, delay_time_bound=(
         stim1s = rng.rand(stim_per_epoch,batch_size)*2*np.pi
         devi_dist = np.zeros_like(stim1s)
         match_or_not = rng.randint(0,2,batch_size) #an array consists of 0&1 with the size of stim1_locs. 0 is match 1 is non-match
-        devi_dist[0,:] = rng.randint(1,config['n_eachring'])*(2*np.pi/config['n_eachring'])*match_or_not
+        devi_dist[0,:] = rng.randint(1,config['n_eachring'],size=batch_size)*(2*np.pi/config['n_eachring'])*match_or_not
         stim2s = (stim1s + devi_dist)%(2*np.pi)
 
         if delay_step is None:
@@ -1555,16 +1783,16 @@ def Capacity_color_mix_uniform_(config, mode, stim_per_epoch, delay_time_bound=(
         tdim     = max_fix_off + int(500/dt)
 
     elif 'test' in mode:
-        #Stimuli
-        n_stim_loc, _ = batch_shape = config['n_eachring'], 16
-        batch_size = np.prod(batch_shape)
-        ind_stim_loc, _ = np.unravel_index(range(batch_size),batch_shape)
-
-        stim1s = rng.rand(stim_per_epoch,batch_size)*2*np.pi
-
-        stim1s[0,:]  = 2*np.pi*ind_stim_loc/n_stim_loc
+        for i in range(9,4,-1): #9~5
+            if config['n_eachring']%i == 0 and i > stim_per_epoch:
+                step = config['n_eachring']//i
+                sub_sample_num = i
+                break
         
-        match_or_not = np.unravel_index(range(batch_size),(config['n_eachring']*2,8))[0]%2
+        #Stimuli
+        stim1s, match_or_not = generate_capacity_test_stim(sub_sample_num,stim_per_epoch,config['n_eachring'],step,rng)
+        batch_size = len(stim1s[0])
+        
         devi_dist = np.zeros_like(stim1s)
         devi_dist[0,:] = match_or_not*np.pi
 
@@ -1597,32 +1825,35 @@ def Capacity_color_mix_uniform_(config, mode, stim_per_epoch, delay_time_bound=(
     # Response locations
     response_locs = (M_choice_loc+match_or_not*np.pi)%(2*np.pi)
 
-    stim_ring_indexes = rng.randint(stim_per_epoch, size=batch_size) #which ring will the changable stimulus be
-    stim_mods_ = np.zeros((batch_size,stim_per_epoch),dtype=int)
-    for tn, idx in enumerate(stim_ring_indexes):
-        stim_mods_[tn,idx] = 1
-    stim_mods = [tuple(i) for i in stim_mods_]
-
     trial = Trial(config, tdim, batch_size)
 
     trial.add('fix_in', offs=fix_offs)
-    #trial.add('stim', stim1s[0], ons=stim1_ons, offs=stim1_offs, mods=(1,1,1))#RGB(white)
-    #trial.add('stim', stim2s[0], ons=stim2_ons, offs=stim2_offs, mods=(1,1,1))#RGB(white)
-    trial.add('stim', stim1s[0], ons=stim1_ons, offs=stim1_offs, mods=stim_mods)
-    trial.add('stim', stim2s[0], ons=stim2_ons, offs=stim2_offs, mods=stim_mods)
+    if not white_stims:
+        stim_ring_indexes = rng.randint(stim_per_epoch, size=batch_size) #which ring will the changable stimulus be
+        stim_mods_ = np.zeros((batch_size,stim_per_epoch),dtype=int)
+        for tn, idx in enumerate(stim_ring_indexes):
+            stim_mods_[tn,idx] = 1
+        stim_mods = [tuple(i) for i in stim_mods_]
+        trial.add('stim', stim1s[0], ons=stim1_ons, offs=stim1_offs, mods=stim_mods)
+        trial.add('stim', stim2s[0], ons=stim2_ons, offs=stim2_offs, mods=stim_mods)
+    else:
+        trial.add('stim', stim1s[0], ons=stim1_ons, offs=stim1_offs, mods=(1,)*color_channel_num)#RGB(white)
+        trial.add('stim', stim2s[0], ons=stim2_ons, offs=stim2_offs, mods=(1,)*color_channel_num)#RGB(white)
     for i in range(1,stim_per_epoch):
-        #trial.add('distract', stim1s[i], ons=stim1_ons, offs=stim1_offs, mods=(1,1,1))#RGB(white)
-        #trial.add('distract', stim2s[i], ons=stim2_ons, offs=stim2_offs, mods=(1,1,1))#RGB(white)
-        distract_ring_indexes = (stim_ring_indexes+i)%stim_per_epoch
-        distr_mods_ = np.zeros((batch_size,stim_per_epoch),dtype=int)
-        for tn, idx in enumerate(distract_ring_indexes):
-            distr_mods_[tn,idx] = 1
-        distr_mods = [tuple(i) for i in distr_mods_]
-        trial.add('distract', stim1s[i], ons=stim1_ons, offs=stim1_offs, mods=distr_mods)#RGB(white)
-        trial.add('distract', stim2s[i], ons=stim2_ons, offs=stim2_offs, mods=distr_mods)#RGB(white)
+        if not white_stims:
+            distract_ring_indexes = (stim_ring_indexes+i)%stim_per_epoch
+            distr_mods_ = np.zeros((batch_size,stim_per_epoch),dtype=int)
+            for tn, idx in enumerate(distract_ring_indexes):
+                distr_mods_[tn,idx] = 1
+            distr_mods = [tuple(i) for i in distr_mods_]
+            trial.add('stim', stim1s[i], ons=stim1_ons, offs=stim1_offs, mods=distr_mods)
+            trial.add('stim', stim2s[i], ons=stim2_ons, offs=stim2_offs, mods=distr_mods)
+        else:
+            trial.add('stim', stim1s[i], ons=stim1_ons, offs=stim1_offs, mods=(1,)*color_channel_num)#RGB(white)
+            trial.add('stim', stim2s[i], ons=stim2_ons, offs=stim2_offs, mods=(1,)*color_channel_num)#RGB(white)
 
-    trial.add('choice', M_choice_loc, ons=choice_ons, mods=(0,1,0))#Green
-    trial.add('choice', NM_choice_loc, ons=choice_ons, mods=(0,0,1))#Blue
+    trial.add('choice', M_choice_loc, ons=choice_ons, mods=(1,0))#Red
+    trial.add('choice', NM_choice_loc, ons=choice_ons, mods=(0,1))#Green
 
     trial.add('fix_out', offs=fix_offs)
     trial.add('out', response_locs, ons=fix_offs)
@@ -1636,11 +1867,21 @@ def Capacity_color_mix_uniform_(config, mode, stim_per_epoch, delay_time_bound=(
                    'delay2'    : (stim2_offs, choice_ons),
                    'go1'       : (fix_offs, None)} #go period is also the choice display period
 
-    trial.location_info = { 'fix1':[None]*len(stim1s[0]),
-                            'stim1':stim1s[0],
-                            'delay1':stim1s[0],
-                            'stim2':stim2s[0],
-                            'delay2':stim2s[0],
+    if mode == 'test':
+        stim1_conditions = (stim1s.T/(2 * np.pi)*config['n_eachring']).astype(np.int32)
+        stim1_conditions = np.array([int(''.join([str(s) for s in s1])) for s1 in stim1_conditions])
+        stim2_conditions = (stim2s.T/(2 * np.pi)*config['n_eachring']).astype(np.int32)
+        stim2_conditions = np.array([int(''.join([str(s) for s in s2])) for s2 in stim2_conditions])
+
+    else:
+        stim1_conditions = stim1s
+        stim2_conditions = stim2s
+    
+    trial.location_info = { 'fix1':[None]*batch_size,
+                            'stim1':stim1_conditions,
+                            'delay1':stim1_conditions,
+                            'stim2':stim2_conditions,
+                            'delay2':stim2_conditions,
                             'go1':response_locs,}
 
     #TODO:add task info here
@@ -1649,6 +1890,280 @@ def Capacity_color_mix_uniform_(config, mode, stim_per_epoch, delay_time_bound=(
 
 def Capacity_color_mix_uniform_001001(config, mode, **kwargs):
     return Capacity_color_mix_uniform_(config, mode, 3, delay_time_bound=(0,1000), delay_step=100,**kwargs)
+
+def Capacity_color_mix_uniform_001005(config, mode, **kwargs):
+    return Capacity_color_mix_uniform_(config, mode, 3, delay_time_bound=(0,1000), delay_step=500,**kwargs)
+
+def Capacity_strength_(config, mode, delaytime, stim_per_epoch, fix_choice_loc=True,delaytime2=None,**kwargs):
+    #                delay1    delay2
+    # ----------^^^^^-----^^^^^-----^^^^^
+    #           stim1     stim2     choice
+    # ------------------------------>>>>>
+    #            fixation            go
+    #
+    dt = config['dt']
+    rng = config['rng']
+    if delaytime2 is None:
+        delaytime2 = delaytime
+
+    if mode == 'random': # Randomly generate parameters
+        #Stimuli
+        batch_size = kwargs['batch_size']
+        stim1s = rng.rand(stim_per_epoch,batch_size)*2*np.pi
+        devi_dist = np.zeros_like(stim1s)
+        match_or_not = rng.randint(0,2,batch_size) #an array consists of 0&1 with the size of stim1_locs. 0 is match 1 is non-match
+        devi_dist[0,:] = rng.randint(1,config['n_eachring'],size=batch_size)*(2*np.pi/config['n_eachring'])*match_or_not
+        stim2s = (stim1s + devi_dist)%(2*np.pi)
+
+
+        # Timeline
+        stim1_ons  = int(1000/dt)
+        stim1_offs = stim1_ons + int(500/dt) #last for 0.5s
+
+        stim2_ons= stim1_offs+int(delaytime/dt) #delay
+        stim2_offs= stim2_ons+int(500/dt) # last for 0.5s
+
+        choice_ons= stim2_offs+int(delaytime2/dt) #delay
+
+        fix_offs = choice_ons
+
+        tdim     = fix_offs + int(500/dt)
+
+    elif mode == 'test':
+        for i in range(9,4,-1): #9~5
+            if config['n_eachring']%i == 0 and i > stim_per_epoch:
+                step = config['n_eachring']//i
+                sub_sample_num = i
+                break
+        
+        #Stimuli
+        stim1s, match_or_not = generate_capacity_test_stim(sub_sample_num,stim_per_epoch,config['n_eachring'],step,rng)
+        batch_size = len(stim1s[0])
+        
+        devi_dist = np.zeros_like(stim1s)
+        devi_dist[0,:] = match_or_not*np.pi
+
+        stim2s = (stim1s + devi_dist)%(2*np.pi)
+
+        #Timeline
+        stim1_ons  = int(1000/dt)
+        stim1_offs = stim1_ons + int(500/dt) #last for 0.5s
+
+        stim2_ons= stim1_offs+int(delaytime/dt) #delay
+        stim2_offs= stim2_ons+int(500/dt) # last for 0.5s
+
+        choice_ons= stim2_offs+int(delaytime2/dt) #delay
+
+        fix_offs = choice_ons
+        
+        tdim     = fix_offs + int(500/dt)
+
+    else:
+        raise ValueError('Unknown mode: ' + str(mode))
+
+    check_ons= fix_offs + int(100/dt)
+
+    if fix_choice_loc:
+        # Match and Non-Match choice location
+        M_choice_loc = np.zeros(batch_size)
+        NM_choice_loc = np.ones(batch_size)*np.pi
+    else:
+        # Match and Non-Match choice location
+        M_choice_loc = np.random.randint(config['n_eachring'],size=batch_size)*(2*np.pi/config['n_eachring'])
+        NM_choice_loc = (M_choice_loc+np.pi)%(2*np.pi)
+    # Response locations
+    response_locs = (M_choice_loc+match_or_not*np.pi)%(2*np.pi)
+
+
+    trial = Trial(config, tdim, batch_size)
+
+    trial.add('fix_in', offs=fix_offs)
+    trial.add('stim', stim1s[0], ons=stim1_ons, offs=stim1_offs, mods=1)
+    trial.add('stim', stim2s[0], ons=stim2_ons, offs=stim2_offs, mods=1)
+    for i in range(1,stim_per_epoch):
+        trial.add('stim', stim1s[i], ons=stim1_ons, offs=stim1_offs, mods=1)
+        trial.add('stim', stim2s[i], ons=stim2_ons, offs=stim2_offs, mods=1)
+
+    trial.add('choice', M_choice_loc, ons=choice_ons, mods=2,strengths=1)
+    trial.add('choice', NM_choice_loc, ons=choice_ons, mods=2, strengths=0.5)
+
+    trial.add('fix_out', offs=fix_offs)
+    trial.add('out', response_locs, ons=fix_offs)
+    
+    trial.add_c_mask(pre_offs=fix_offs, post_ons=check_ons,)
+
+    trial.epochs = {'fix1'     : (None, stim1_ons),
+                   'stim1'     : (stim1_ons, stim1_offs),
+                   'delay1'    : (stim1_offs, stim2_ons),
+                   'stim2'     : (stim2_ons, stim2_offs),
+                   'delay2'    : (stim2_offs, choice_ons),
+                   'go1'       : (fix_offs, None)} #go period is also the choice display period
+
+    if mode == 'test':
+        stim1_conditions = (stim1s.T/(2 * np.pi)*config['n_eachring']).astype(np.int32)
+        stim1_conditions = np.array([int(''.join([str(s) for s in s1])) for s1 in stim1_conditions])
+        stim2_conditions = (stim2s.T/(2 * np.pi)*config['n_eachring']).astype(np.int32)
+        stim2_conditions = np.array([int(''.join([str(s) for s in s2])) for s2 in stim2_conditions])
+
+    else:
+        stim1_conditions = stim1s
+        stim2_conditions = stim2s
+
+    trial.location_info = { 'fix1':[None]*batch_size,
+                            'stim1':stim1_conditions,
+                            'delay1':stim1_conditions,
+                            'stim2':stim2_conditions,
+                            'delay2':stim2_conditions,
+                            'go1':response_locs,}
+
+    #TODO:add task info here
+
+    return trial
+
+def Capacity_strength_fix_choice(config, mode, **kwargs):
+    return Capacity_strength_(config, mode, 500, 2, **kwargs)
+
+def Capacity_strength(config, mode, **kwargs):
+    return Capacity_strength_(config, mode, 500, 2, fix_choice_loc=False, **kwargs)
+
+def Capacity_strength_mix_uniform_(config, mode, stim_per_epoch, delay_time_bound=(0,1000), delay_step=None, fix_choice_loc=True,**kwargs):
+    #                delay1    delay2
+    # ----------^^^^^-----^^^^^-----^^^^^
+    #           stim1     stim2     choice
+    # ------------------------------>>>>>
+    #            fixation            go
+    #
+    dt = config['dt']
+    rng = config['rng']
+    if mode == 'random': # Randomly generate parameters
+        #Stimuli
+        batch_size = kwargs['batch_size']
+        stim1s = rng.rand(stim_per_epoch,batch_size)*2*np.pi
+        devi_dist = np.zeros_like(stim1s)
+        match_or_not = rng.randint(0,2,batch_size) #an array consists of 0&1 with the size of stim1_locs. 0 is match 1 is non-match
+        devi_dist[0,:] = rng.randint(1,config['n_eachring'],size=batch_size)*(2*np.pi/config['n_eachring'])*match_or_not
+        stim2s = (stim1s + devi_dist)%(2*np.pi)
+
+        if delay_step is None:
+            delay_time = np.random.uniform(delay_time_bound[0],delay_time_bound[1],batch_size)
+        else:
+            time_range = list(range(delay_time_bound[0],delay_time_bound[1]+1,delay_step))
+            delay_time = np.random.choice(time_range,size=(batch_size))
+
+
+        # Timeline
+        stim1_ons  = int(1000/dt)
+        stim1_offs = stim1_ons + int(500/dt) #last for 0.5s
+
+        stim2_ons= stim1_offs+(delay_time/dt).astype(np.int32) #delay
+        stim2_offs= stim2_ons+int(500/dt) # last for 0.5s
+
+        max_fix_off = stim1_offs + int(500/dt) + 2*int(delay_time_bound[1]/dt)
+
+        choice_ons= stim2_offs + (delay_time/dt).astype(np.int32) #delay
+
+        fix_offs = choice_ons
+
+        tdim     = max_fix_off + int(500/dt)
+
+    elif 'test' in mode:
+        for i in range(9,4,-1): #9~5
+            if config['n_eachring']%i == 0 and i > stim_per_epoch:
+                step = config['n_eachring']//i
+                sub_sample_num = i
+                break
+        
+        #Stimuli
+        stim1s, match_or_not = generate_capacity_test_stim(sub_sample_num,stim_per_epoch,config['n_eachring'],step,rng)
+        batch_size = len(stim1s[0])
+        
+        devi_dist = np.zeros_like(stim1s)
+        devi_dist[0,:] = match_or_not*np.pi
+
+        stim2s = (stim1s + devi_dist)%(2*np.pi)
+
+        #Timeline
+        delay_time = int(mode.split('-')[1])
+        stim1_ons  = int(1000/dt)
+        stim1_offs = stim1_ons + int(500/dt) #last for 0.5s
+
+        stim2_ons= stim1_offs+int(delay_time/dt) #delay
+        stim2_offs= stim2_ons+int(500/dt) # last for 0.5s
+
+        choice_ons= stim2_offs+int(delay_time/dt) #delay
+
+        fix_offs = choice_ons
+        
+        tdim     = fix_offs + int(500/dt)
+
+    else:
+        raise ValueError('Unknown mode: ' + str(mode))
+
+    check_ons= fix_offs + int(100/dt)
+    check_offs = fix_offs + int(500/dt)
+
+    if fix_choice_loc:
+        # Match and Non-Match choice location
+        M_choice_loc = np.zeros(batch_size)
+        NM_choice_loc = np.ones(batch_size)*np.pi
+    else:
+        # Match and Non-Match choice location
+        M_choice_loc = np.random.randint(config['n_eachring'],size=batch_size)*(2*np.pi/config['n_eachring'])
+        NM_choice_loc = (M_choice_loc+np.pi)%(2*np.pi)
+    # Response locations
+    response_locs = (M_choice_loc+match_or_not*np.pi)%(2*np.pi)
+
+
+    trial = Trial(config, tdim, batch_size)
+
+    trial.add('fix_in', offs=fix_offs)
+    trial.add('stim', stim1s[0], ons=stim1_ons, offs=stim1_offs, mods=1)
+    trial.add('stim', stim2s[0], ons=stim2_ons, offs=stim2_offs, mods=1)
+    for i in range(1,stim_per_epoch):
+        trial.add('stim', stim1s[i], ons=stim1_ons, offs=stim1_offs, mods=1)
+        trial.add('stim', stim2s[i], ons=stim2_ons, offs=stim2_offs, mods=1)
+
+    trial.add('choice', M_choice_loc, ons=choice_ons, mods=2,strengths=1)
+    trial.add('choice', NM_choice_loc, ons=choice_ons, mods=2, strengths=0.5)
+
+    trial.add('fix_out', offs=fix_offs)
+    trial.add('out', response_locs, ons=fix_offs)
+    
+    trial.add_c_mask(pre_offs=fix_offs, post_ons=check_ons, post_offs=check_offs)
+
+    trial.epochs = {'fix1'     : (None, stim1_ons),
+                   'stim1'     : (stim1_ons, stim1_offs),
+                   'delay1'    : (stim1_offs, stim2_ons),
+                   'stim2'     : (stim2_ons, stim2_offs),
+                   'delay2'    : (stim2_offs, choice_ons),
+                   'go1'       : (fix_offs, None)} #go period is also the choice display period
+
+    if mode == 'test':
+        stim1_conditions = (stim1s.T/(2 * np.pi)*config['n_eachring']).astype(np.int32)
+        stim1_conditions = np.array([int(''.join([str(s) for s in s1])) for s1 in stim1_conditions])
+        stim2_conditions = (stim2s.T/(2 * np.pi)*config['n_eachring']).astype(np.int32)
+        stim2_conditions = np.array([int(''.join([str(s) for s in s2])) for s2 in stim2_conditions])
+
+    else:
+        stim1_conditions = stim1s
+        stim2_conditions = stim2s
+
+    trial.location_info = { 'fix1':[None]*batch_size,
+                            'stim1':stim1_conditions,
+                            'delay1':stim1_conditions,
+                            'stim2':stim2_conditions,
+                            'delay2':stim2_conditions,
+                            'go1':response_locs,}
+
+    #TODO:add task info here
+
+    return trial
+
+def Capacity_strength_mix_uniform_001001_fix_choice(config, mode, **kwargs):
+    return Capacity_strength_mix_uniform_(config, mode, 2, delay_time_bound=(0,1000), delay_step=100,**kwargs)
+
+def Capacity_strength_mix_uniform_001005_fix_choice(config, mode, **kwargs):
+    return Capacity_strength_mix_uniform_(config, mode, 2, delay_time_bound=(0,1000), delay_step=500,**kwargs)
 
 rule_mapping = {
                 'odr': odr,
@@ -1660,10 +2175,10 @@ rule_mapping = {
                 'odr1200':odr1200,
                 'odr1300':odr1300,
                 'odr1400':odr1400,
-                'odr2000':odr3000,
+                'odr2000':odr2000,
                 'odr3000':odr3000,
-                'odr4000':odr3000,
-                'odr5000':odr3000,
+                'odr4000':odr4000,
+                'odr5000':odr5000,
                 'odr6000':odr6000,
                 'odr15000':odr15000,
                 ###################
@@ -1676,7 +2191,9 @@ rule_mapping = {
                 'match_or_non_easy': match_or_non_easy,
                 'match_or_non_passive': match_or_non_passive,
                 'MNM_color':MNM_color,
+                'MNM_color_2chan':MNM_color_2chan,
                 'MNM_color_1240':MNM_color_1240,
+                'MNM_strength_fix_choice':MNM_strength_fix_choice,
                 'MNM_strength':MNM_strength,
                 #'MNM_sequential_phase1':MNM_sequential_phase1,
                 'MNM_sequential_phase1_m':MNM_sequential_phase1_m,
@@ -1684,8 +2201,33 @@ rule_mapping = {
                 'MNM_sequential_phase2':MNM_sequential_phase2,
                 'MNM_sequential_phase3':MNM_sequential_phase3,
                 'MNM_sequential_phase4':MNM_sequential_phase4,
+
                 'Capacity_color':Capacity_color,
+                'Capacity_color_2_stims_white_stims':Capacity_color_2_stims_white_stims,
+                'Capacity_color_2_stims_white_stims_2chan':Capacity_color_2_stims_white_stims_2chan,
+                'Capacity_color_3_stims_white_stims':Capacity_color_3_stims_white_stims,
+                'Capacity_color_3_stims_white_stims_2chan':Capacity_color_3_stims_white_stims_2chan,
+                'Capacity_color_4_stims_white_stims':Capacity_color_4_stims_white_stims,
+                'Capacity_color_4_stims_white_stims_2chan':Capacity_color_4_stims_white_stims_2chan,
+                'Capacity_color_5_stims_white_stims':Capacity_color_5_stims_white_stims,
+
+                'Capacity_color_1_stims_white_stims_1s05s':Capacity_color_1_stims_white_stims_1s05s,
+                'Capacity_color_2_stims_white_stims_1s05s':Capacity_color_2_stims_white_stims_1s05s,
+                'Capacity_color_3_stims_white_stims_1s05s':Capacity_color_3_stims_white_stims_1s05s,
+                'Capacity_color_4_stims_white_stims_1s05s':Capacity_color_4_stims_white_stims_1s05s,
+                'Capacity_color_5_stims_white_stims_1s05s':Capacity_color_5_stims_white_stims_1s05s,
+
+                'Capacity_color_1_stims_wht_stims_1s05s_mx':Capacity_color_1_stims_wht_stims_1s05s_mx,
+                'Capacity_color_2_stims_wht_stims_1s05s_mx':Capacity_color_2_stims_wht_stims_1s05s_mx,
+                'Capacity_color_3_stims_wht_stims_1s05s_mx':Capacity_color_3_stims_wht_stims_1s05s_mx,
+                'Capacity_color_4_stims_wht_stims_1s05s_mx':Capacity_color_4_stims_wht_stims_1s05s_mx,
+                'Capacity_color_5_stims_wht_stims_1s05s_mx':Capacity_color_5_stims_wht_stims_1s05s_mx,
+
                 'Capacity_color_mix_uniform_001001':Capacity_color_mix_uniform_001001,
+                'Capacity_color_mix_uniform_001005':Capacity_color_mix_uniform_001005,
+
+                'Capacity_strength_fix_choice':Capacity_strength_fix_choice,
+                'Capacity_strength':Capacity_strength,
                 }
 
 rule_name    = {
@@ -1698,10 +2240,10 @@ rule_name    = {
                 'odr1200':'ODR1200',
                 'odr1300':'ODR1300',
                 'odr1400':'ODR1400',
-                'odr3000':'ODR2000',
+                'odr2000':'ODR2000',
                 'odr3000':'ODR3000',
-                'odr3000':'ODR4000',
-                'odr3000':'ODR5000',
+                'odr4000':'ODR4000',
+                'odr5000':'ODR5000',
                 'odr6000':'ODR6000',
                 'odr15000':'ODR15000',
                 ####################
@@ -1714,16 +2256,43 @@ rule_name    = {
                 'match_or_non_easy': 'MorNe',
                 'match_or_non_passive': 'MorNp',
                 'MNM_color':'MNM color encode',
+                'MNM_color_2chan':'MNM color encode, 2 color channels',
                 'MNM_color_1240':'MNM 1.24s color encode',
-                'MNM_strength':'MNM strength encode',
+                'MNM_strength_fix_choice':'MNM strength encoded, with fix choice location',
+                'MNM_strength':'MNM strength encoded',
                 #'MNM_sequential_phase1':'MNM seq phase1',
                 'MNM_sequential_phase1_m':'MNM seq phase1 M',
                 'MNM_sequential_phase1_nm':'MNM seq phase1 NM',
                 'MNM_sequential_phase2':'MNM seq phase2',
                 'MNM_sequential_phase3':'MNM seq phase3',
                 'MNM_sequential_phase4':'MNM seq phase4',
+
                 'Capacity_color':'Capacity task',
+                'Capacity_color_2_stims_white_stims':'Capacity color encoded, 2 white stimulus',
+                'Capacity_color_2_stims_white_stims_2chan':'Capacity color encoded, 2 white stimulus, 2 color channel',
+                'Capacity_color_3_stims_white_stims':'Capacity color encoded, 3 white stimulus',
+                'Capacity_color_3_stims_white_stims_2chan':'Capacity color encoded, 3 white stimulus, 2 color channel',
+                'Capacity_color_4_stims_white_stims':'Capacity color encoded, 4 white stimulus',
+                'Capacity_color_4_stims_white_stims_2chan':'Capacity color encoded, 4 white stimulus, 2 color channel',
+                'Capacity_color_5_stims_white_stims':'Capacity color encoded, 5 white stimulus',
+
+                'Capacity_color_1_stims_white_stims_1s05s':'Capacity color encoded, 1 white stimulus, D1:1s D2:0.5s',
+                'Capacity_color_2_stims_white_stims_1s05s':'Capacity color encoded, 2 white stimulus, D1:1s D2:0.5s',
+                'Capacity_color_3_stims_white_stims_1s05s':'Capacity color encoded, 3 white stimulus, D1:1s D2:0.5s',
+                'Capacity_color_4_stims_white_stims_1s05s':'Capacity color encoded, 4 white stimulus, D1:1s D2:0.5s',
+                'Capacity_color_5_stims_white_stims_1s05s':'Capacity color encoded, 5 white stimulus, D1:1s D2:0.5s',
+
+                'Capacity_color_1_stims_wht_stims_1s05s_mx':'Capacity color encoded add by mx, 1 white stimulus, D1:1s D2:0.5s',
+                'Capacity_color_2_stims_wht_stims_1s05s_mx':'Capacity color encoded add by mx, 2 white stimulus, D1:1s D2:0.5s',
+                'Capacity_color_3_stims_wht_stims_1s05s_mx':'Capacity color encoded add by mx, 3 white stimulus, D1:1s D2:0.5s',
+                'Capacity_color_4_stims_wht_stims_1s05s_mx':'Capacity color encoded add by mx, 4 white stimulus, D1:1s D2:0.5s',
+                'Capacity_color_5_stims_wht_stims_1s05s_mx':'Capacity color encoded add by mx, 5 white stimulus, D1:1s D2:0.5s',
+
                 'Capacity_color_mix_uniform_001001':'Capacity mix delay 0s~1s,0.1s',
+                'Capacity_color_mix_uniform_001005':'Capacity mix delay 0s~1s,0.5s',
+
+                'Capacity_strength_fix_choice':'Strength encoded Capacity task, with fix choice location',
+                'Capacity_strength':'Strength encoded Capacity task',
                 }
 
 
