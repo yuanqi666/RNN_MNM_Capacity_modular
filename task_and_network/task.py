@@ -56,10 +56,28 @@ rules_dict = \
     'Capacity_stim1-5_clrwht_6tasks_1s05s':['overlap','zero_gap','gap','odr','odrd','gap500',\
         'Capacity_color_1_stims_white_stims_1s05s','Capacity_color_2_stims_white_stims_1s05s','Capacity_color_3_stims_white_stims_1s05s',\
             'Capacity_color_4_stims_white_stims_1s05s','Capacity_color_5_stims_white_stims_1s05s'],
+
+    'Capacity_stim1-4_clrwht_6tasks_1s05s':['overlap','zero_gap','gap','odr','odrd','gap500',\
+        'Capacity_color_1_stims_white_stims_1s05s','Capacity_color_2_stims_white_stims_1s05s','Capacity_color_3_stims_white_stims_1s05s',\
+            'Capacity_color_4_stims_white_stims_1s05s', #5-8 are not trained, just for test
+            'Capacity_color_5_stims_white_stims_1s05s','Capacity_color_6_stims_white_stims_1s05s','Capacity_color_7_stims_white_stims_1s05s','Capacity_color_8_stims_white_stims_1s05s'],
     
     'Capacity_stim1-5_clrwht_6tasks_1s05s_mx':['overlap','zero_gap','gap','odr','odrd','gap500',\
         'Capacity_color_1_stims_wht_stims_1s05s_mx','Capacity_color_2_stims_wht_stims_1s05s_mx','Capacity_color_3_stims_wht_stims_1s05s_mx',\
             'Capacity_color_4_stims_wht_stims_1s05s_mx','Capacity_color_5_stims_wht_stims_1s05s_mx'],
+    
+    'Capacity_stim1-4_clrwht_6tasks_1s05s_mx':['overlap','zero_gap','gap','odr','odrd','gap500',\
+        'Capacity_color_1_stims_wht_stims_1s05s_mx','Capacity_color_2_stims_wht_stims_1s05s_mx','Capacity_color_3_stims_wht_stims_1s05s_mx',\
+            'Capacity_color_4_stims_wht_stims_1s05s_mx',#5-8 are not trained, just for test
+            'Capacity_color_5_stims_wht_stims_1s05s_mx','Capacity_color_6_stims_wht_stims_1s05s_mx','Capacity_color_7_stims_wht_stims_1s05s_mx','Capacity_color_8_stims_wht_stims_1s05s_mx',],
+    
+    'Capacity_clr_mixuni_1-5stim_0105_6tasks_mx':['overlap','zero_gap','gap','odr','odrd','gap500',\
+        'Capacity_clr_mixuni_1stim_0105_mx','Capacity_clr_mixuni_2stim_0105_mx','Capacity_clr_mixuni_3stim_0105_mx',\
+            'Capacity_clr_mixuni_4stim_0105_mx','Capacity_clr_mixuni_5stim_0105_mx'],
+
+    'Capacity_clr_mixuni_1-5stim_0105_6tasks':['overlap','zero_gap','gap','odr','odrd','gap500',\
+        'Capacity_clr_mixuni_1stim_0105','Capacity_clr_mixuni_2stim_0105','Capacity_clr_mixuni_3stim_0105',\
+            'Capacity_clr_mixuni_4stim_0105','Capacity_clr_mixuni_5stim_0105'],
 
     'Capacity_mix_delay001001_6tasks':['Capacity_color_mix_uniform_001001','overlap','zero_gap','gap','odr','odrd','gap500',],
     'Capacity_mix_delay001005_6tasks':['Capacity_color_mix_uniform_001005','overlap','zero_gap','gap','odr','odrd','gap500',],
@@ -1507,7 +1525,7 @@ def Capacity_color_(config, mode, delaytime, stim_per_epoch, \
 
     elif mode == 'test':
         for i in range(9,4,-1): #9~5
-            if config['n_eachring']%i == 0 and i > stim_per_epoch:
+            if config['n_eachring']%i == 0 and i >= stim_per_epoch:
                 step = config['n_eachring']//i
                 sub_sample_num = i
                 break
@@ -1573,9 +1591,107 @@ def Capacity_color_(config, mode, delaytime, stim_per_epoch, \
         
         tdim     = fix_offs + int(500/dt)
 
+    elif mode == 'stimnearRF':
+        #stim_per_epoch should >=2
+        ntrial_per_cond = config['n_eachring']-2
+        batch_shape = config['n_eachring'], ntrial_per_cond*6
+        batch_size = np.prod(batch_shape)
+        match_or_not = np.array(
+            ([0,]*(ntrial_per_cond-1)+[1,]*(ntrial_per_cond+1)+([0,]*ntrial_per_cond+[1,]*ntrial_per_cond)*2)*config['n_eachring']
+            )
+
+        stim1s = np.full((stim_per_epoch,batch_size), np.nan)
+        stim1s[0] = np.unravel_index(range(batch_size),(config['n_eachring'],ntrial_per_cond*6))[0]
+
+        multistim_mask = ([0,]*ntrial_per_cond*2+[1,]*ntrial_per_cond*2+[-1,]*ntrial_per_cond*2)*config['n_eachring']
+        for i,mask in enumerate(multistim_mask):
+            if mask == 1:
+                stim1s[1,i] = (stim1s[0,i] + 1)%config['n_eachring']
+            elif mask == -1:
+                stim1s[1,i] = (stim1s[0,i] - 1 + config['n_eachring'])%config['n_eachring']
+
+        stim2s = np.full((stim_per_epoch,batch_size), np.nan)
+        stim2s[:] = stim1s[:]
+        for i in range(config['n_eachring']):
+            nm1 = list(range(config['n_eachring']))
+            nm2_1 = list(range(config['n_eachring']))
+            nm2_2 = list(range(config['n_eachring']))
+
+            nm1.remove(i)
+            nm2_1.remove(i)
+            nm2_1.remove((i+1)%config['n_eachring'])
+            nm2_2.remove(i)
+            nm2_2.remove((i-1+config['n_eachring'])%config['n_eachring'])
+
+            stim2s[0,i*ntrial_per_cond*6+ntrial_per_cond-1:i*ntrial_per_cond*6+2*ntrial_per_cond] = np.array(nm1)
+            stim2s[0,i*ntrial_per_cond*6+3*ntrial_per_cond:i*ntrial_per_cond*6+4*ntrial_per_cond] = np.array(nm2_1)
+            stim2s[0,i*ntrial_per_cond*6+5*ntrial_per_cond:i*ntrial_per_cond*6+6*ntrial_per_cond] = np.array(nm2_2)
+
+        stim1s = stim1s * 2 * np.pi / config['n_eachring']
+        stim2s = stim2s * 2 * np.pi / config['n_eachring']
+
+        #Timeline
+        stim1_ons  = int(1000/dt)
+        stim1_offs = stim1_ons + int(500/dt) #last for 0.5s
+
+        stim2_ons= stim1_offs+int(delaytime/dt) #delay
+        stim2_offs= stim2_ons+int(500/dt) # last for 0.5s
+
+        choice_ons= stim2_offs+int(delaytime2/dt) #delay
+
+        fix_offs = choice_ons
+        
+        tdim     = fix_offs + int(500/dt)
+
+    elif mode == 'stimoppositeRF':
+        #stim_per_epoch should >=2
+        ntrial_per_cond = config['n_eachring']-2
+        batch_shape = config['n_eachring'], ntrial_per_cond*4
+        batch_size = np.prod(batch_shape)
+        match_or_not = np.array(
+            ([0,]*(ntrial_per_cond-1)+[1,]*(ntrial_per_cond+1)+[0,]*ntrial_per_cond+[1,]*ntrial_per_cond)*config['n_eachring']
+            )
+
+        stim1s = np.full((stim_per_epoch,batch_size), np.nan)
+        stim1s[0] = np.unravel_index(range(batch_size),(config['n_eachring'],ntrial_per_cond*4))[0]
+
+        multistim_mask = ([0,]*ntrial_per_cond*2+[1,]*ntrial_per_cond*2)*config['n_eachring']
+        for i,mask in enumerate(multistim_mask):
+            if mask == 1:
+                stim1s[1,i] = (stim1s[0,i] + config['n_eachring']//2)%config['n_eachring']
+
+        stim2s = np.full((stim_per_epoch,batch_size), np.nan)
+        stim2s[:] = stim1s[:]
+        for i in range(config['n_eachring']):
+            nm1 = list(range(config['n_eachring']))
+            nm2 = list(range(config['n_eachring']))
+
+            nm1.remove(i)
+            nm2.remove(i)
+            nm2.remove((i+config['n_eachring']//2)%config['n_eachring'])
+
+            stim2s[0,i*ntrial_per_cond*4+ntrial_per_cond-1:i*ntrial_per_cond*4+2*ntrial_per_cond] = np.array(nm1)
+            stim2s[0,i*ntrial_per_cond*4+3*ntrial_per_cond:i*ntrial_per_cond*4+4*ntrial_per_cond] = np.array(nm2)
+
+        stim1s = stim1s * 2 * np.pi / config['n_eachring']
+        stim2s = stim2s * 2 * np.pi / config['n_eachring']
+
+        #Timeline
+        stim1_ons  = int(1000/dt)
+        stim1_offs = stim1_ons + int(500/dt) #last for 0.5s
+
+        stim2_ons= stim1_offs+int(delaytime/dt) #delay
+        stim2_offs= stim2_ons+int(500/dt) # last for 0.5s
+
+        choice_ons= stim2_offs+int(delaytime2/dt) #delay
+
+        fix_offs = choice_ons
+        
+        tdim     = fix_offs + int(500/dt)
+
     elif mode == 'move_one_loc':
         for i in range(9,4,-1): #9~5
-            if config['n_eachring']%i == 0 and i > stim_per_epoch:
+            if config['n_eachring']%i == 0 and i >= stim_per_epoch:
                 step = config['n_eachring']//i
                 sub_sample_num = i
                 break
@@ -1725,6 +1841,15 @@ def Capacity_color_4_stims_white_stims_1s05s(config, mode, **kwargs):
 def Capacity_color_5_stims_white_stims_1s05s(config, mode, **kwargs):
     return Capacity_color_(config, mode, 1000, 5,delaytime2=500, white_stims=True ,**kwargs)
 
+def Capacity_color_6_stims_white_stims_1s05s(config, mode, **kwargs):
+    return Capacity_color_(config, mode, 1000, 6,delaytime2=500, white_stims=True ,**kwargs)
+
+def Capacity_color_7_stims_white_stims_1s05s(config, mode, **kwargs):
+    return Capacity_color_(config, mode, 1000, 7,delaytime2=500, white_stims=True ,**kwargs)
+
+def Capacity_color_8_stims_white_stims_1s05s(config, mode, **kwargs):
+    return Capacity_color_(config, mode, 1000, 8,delaytime2=500, white_stims=True ,**kwargs)
+
 ####################################################################################################
 
 def Capacity_color_1_stims_wht_stims_1s05s_mx(config, mode, **kwargs):
@@ -1742,7 +1867,16 @@ def Capacity_color_4_stims_wht_stims_1s05s_mx(config, mode, **kwargs):
 def Capacity_color_5_stims_wht_stims_1s05s_mx(config, mode, **kwargs):
     return Capacity_color_(config, mode, 1000, 5,delaytime2=500, white_stims=True ,add_mode='maximum',**kwargs)
 
-def Capacity_color_mix_uniform_(config, mode, stim_per_epoch, delay_time_bound=(0,1000), delay_step=None, white_stims=False, color_channel_num=3, **kwargs):
+def Capacity_color_6_stims_wht_stims_1s05s_mx(config, mode, **kwargs):
+    return Capacity_color_(config, mode, 1000, 6,delaytime2=500, white_stims=True ,add_mode='maximum',**kwargs)
+
+def Capacity_color_7_stims_wht_stims_1s05s_mx(config, mode, **kwargs):
+    return Capacity_color_(config, mode, 1000, 7,delaytime2=500, white_stims=True ,add_mode='maximum',**kwargs)
+
+def Capacity_color_8_stims_wht_stims_1s05s_mx(config, mode, **kwargs):
+    return Capacity_color_(config, mode, 1000, 8,delaytime2=500, white_stims=True ,add_mode='maximum',**kwargs)
+
+def Capacity_color_mix_uniform_(config, mode, stim_per_epoch, delay_time_bound=(0,1000), delay_step=None, white_stims=False, color_channel_num=3, add_mode='add', **kwargs):
     #                delay1    delay2
     # ----------^^^^^-----^^^^^-----^^^^^
     #           stim1     stim2     choice
@@ -1784,7 +1918,7 @@ def Capacity_color_mix_uniform_(config, mode, stim_per_epoch, delay_time_bound=(
 
     elif 'test' in mode:
         for i in range(9,4,-1): #9~5
-            if config['n_eachring']%i == 0 and i > stim_per_epoch:
+            if config['n_eachring']%i == 0 and i >= stim_per_epoch:
                 step = config['n_eachring']//i
                 sub_sample_num = i
                 break
@@ -1811,6 +1945,180 @@ def Capacity_color_mix_uniform_(config, mode, stim_per_epoch, delay_time_bound=(
         fix_offs = choice_ons
         
         tdim     = fix_offs + int(500/dt)
+    
+    # elif mode == 'multistim_withinRF':
+    #     batch_shape = config['n_eachring'], 32
+    #     batch_size = np.prod(batch_shape)
+    #     match_or_not = np.unravel_index(range(batch_size),(config['n_eachring']*4,8))[0]%2
+    #     multistim_mask = np.unravel_index(range(batch_size),(config['n_eachring']*2,16))[0]%2
+
+    #     stim1s = np.full((stim_per_epoch,batch_size), np.nan)
+    #     stim1s[0] = np.unravel_index(range(batch_size),(config['n_eachring'],32))[0]
+
+    #     devi_dist = np.zeros_like(stim1s)
+    #     devi_dist[0,:] = match_or_not*np.pi
+
+    #     for ist in range(1,stim_per_epoch):
+    #         shift_dist = (ist+1)//2
+    #         shift_direc = (ist+1)%2
+
+    #         for i,mask in enumerate(multistim_mask):
+    #             if mask:
+    #                 if i%2 == shift_direc:
+    #                     stim1s[ist,i] = (stim1s[0,i]+shift_dist)%config['n_eachring']
+    #                 else:
+    #                     stim1s[ist,i] = (stim1s[0,i]-shift_dist+config['n_eachring'])%config['n_eachring']
+
+    #     stim1s = stim1s * 2 * np.pi / config['n_eachring']
+    #     stim2s = (stim1s + devi_dist)%(2*np.pi)
+
+    #     #Timeline
+    #     stim1_ons  = int(1000/dt)
+    #     stim1_offs = stim1_ons + int(500/dt) #last for 0.5s
+
+    #     stim2_ons= stim1_offs+int(delaytime/dt) #delay
+    #     stim2_offs= stim2_ons+int(500/dt) # last for 0.5s
+
+    #     choice_ons= stim2_offs+int(delaytime2/dt) #delay
+
+    #     fix_offs = choice_ons
+        
+    #     tdim     = fix_offs + int(500/dt)
+
+    # elif mode == 'stimnearRF':
+    #     #stim_per_epoch should >=2
+    #     ntrial_per_cond = config['n_eachring']-2
+    #     batch_shape = config['n_eachring'], ntrial_per_cond*6
+    #     batch_size = np.prod(batch_shape)
+    #     match_or_not = np.array(
+    #         ([0,]*(ntrial_per_cond-1)+[1,]*(ntrial_per_cond+1)+([0,]*ntrial_per_cond+[1,]*ntrial_per_cond)*2)*config['n_eachring']
+    #         )
+
+    #     stim1s = np.full((stim_per_epoch,batch_size), np.nan)
+    #     stim1s[0] = np.unravel_index(range(batch_size),(config['n_eachring'],ntrial_per_cond*6))[0]
+
+    #     multistim_mask = ([0,]*ntrial_per_cond*2+[1,]*ntrial_per_cond*2+[-1,]*ntrial_per_cond*2)*config['n_eachring']
+    #     for i,mask in enumerate(multistim_mask):
+    #         if mask == 1:
+    #             stim1s[1,i] = (stim1s[0,i] + 1)%config['n_eachring']
+    #         elif mask == -1:
+    #             stim1s[1,i] = (stim1s[0,i] - 1 + config['n_eachring'])%config['n_eachring']
+
+    #     stim2s = np.full((stim_per_epoch,batch_size), np.nan)
+    #     stim2s[:] = stim1s[:]
+    #     for i in range(config['n_eachring']):
+    #         nm1 = list(range(config['n_eachring']))
+    #         nm2_1 = list(range(config['n_eachring']))
+    #         nm2_2 = list(range(config['n_eachring']))
+
+    #         nm1.remove(i)
+    #         nm2_1.remove(i)
+    #         nm2_1.remove((i+1)%config['n_eachring'])
+    #         nm2_2.remove(i)
+    #         nm2_2.remove((i-1+config['n_eachring'])%config['n_eachring'])
+
+    #         stim2s[0,i*ntrial_per_cond*6+ntrial_per_cond-1:i*ntrial_per_cond*6+2*ntrial_per_cond] = np.array(nm1)
+    #         stim2s[0,i*ntrial_per_cond*6+3*ntrial_per_cond:i*ntrial_per_cond*6+4*ntrial_per_cond] = np.array(nm2_1)
+    #         stim2s[0,i*ntrial_per_cond*6+5*ntrial_per_cond:i*ntrial_per_cond*6+6*ntrial_per_cond] = np.array(nm2_2)
+
+    #     stim1s = stim1s * 2 * np.pi / config['n_eachring']
+    #     stim2s = stim2s * 2 * np.pi / config['n_eachring']
+
+    #     #Timeline
+    #     stim1_ons  = int(1000/dt)
+    #     stim1_offs = stim1_ons + int(500/dt) #last for 0.5s
+
+    #     stim2_ons= stim1_offs+int(delaytime/dt) #delay
+    #     stim2_offs= stim2_ons+int(500/dt) # last for 0.5s
+
+    #     choice_ons= stim2_offs+int(delaytime2/dt) #delay
+
+    #     fix_offs = choice_ons
+        
+    #     tdim     = fix_offs + int(500/dt)
+
+    # elif mode == 'stimoppositeRF':
+    #     #stim_per_epoch should >=2
+    #     ntrial_per_cond = config['n_eachring']-2
+    #     batch_shape = config['n_eachring'], ntrial_per_cond*4
+    #     batch_size = np.prod(batch_shape)
+    #     match_or_not = np.array(
+    #         ([0,]*(ntrial_per_cond-1)+[1,]*(ntrial_per_cond+1)+[0,]*ntrial_per_cond+[1,]*ntrial_per_cond)*config['n_eachring']
+    #         )
+
+    #     stim1s = np.full((stim_per_epoch,batch_size), np.nan)
+    #     stim1s[0] = np.unravel_index(range(batch_size),(config['n_eachring'],ntrial_per_cond*4))[0]
+
+    #     multistim_mask = ([0,]*ntrial_per_cond*2+[1,]*ntrial_per_cond*2)*config['n_eachring']
+    #     for i,mask in enumerate(multistim_mask):
+    #         if mask == 1:
+    #             stim1s[1,i] = (stim1s[0,i] + config['n_eachring']//2)%config['n_eachring']
+
+    #     stim2s = np.full((stim_per_epoch,batch_size), np.nan)
+    #     stim2s[:] = stim1s[:]
+    #     for i in range(config['n_eachring']):
+    #         nm1 = list(range(config['n_eachring']))
+    #         nm2 = list(range(config['n_eachring']))
+
+    #         nm1.remove(i)
+    #         nm2.remove(i)
+    #         nm2.remove((i+config['n_eachring']//2)%config['n_eachring'])
+
+    #         stim2s[0,i*ntrial_per_cond*4+ntrial_per_cond-1:i*ntrial_per_cond*4+2*ntrial_per_cond] = np.array(nm1)
+    #         stim2s[0,i*ntrial_per_cond*4+3*ntrial_per_cond:i*ntrial_per_cond*4+4*ntrial_per_cond] = np.array(nm2)
+
+    #     stim1s = stim1s * 2 * np.pi / config['n_eachring']
+    #     stim2s = stim2s * 2 * np.pi / config['n_eachring']
+
+    #     #Timeline
+    #     stim1_ons  = int(1000/dt)
+    #     stim1_offs = stim1_ons + int(500/dt) #last for 0.5s
+
+    #     stim2_ons= stim1_offs+int(delaytime/dt) #delay
+    #     stim2_offs= stim2_ons+int(500/dt) # last for 0.5s
+
+    #     choice_ons= stim2_offs+int(delaytime2/dt) #delay
+
+    #     fix_offs = choice_ons
+        
+    #     tdim     = fix_offs + int(500/dt)
+
+    # elif mode == 'move_one_loc':
+    #     for i in range(9,4,-1): #9~5
+    #         if config['n_eachring']%i == 0 and i >= stim_per_epoch:
+    #             step = config['n_eachring']//i
+    #             sub_sample_num = i
+    #             break
+        
+    #     #Stimuli
+    #     trial_per_cond = 8+4*stim_per_epoch
+    #     stim1s, _ = generate_capacity_test_stim(sub_sample_num,stim_per_epoch,config['n_eachring'],step,rng,trial_per_cond)
+
+    #     batch_size = len(stim1s[0])
+    #     cond_num = int(batch_size/(trial_per_cond))
+    #     match_or_not = np.array(([0,]*8+[1,]*4*stim_per_epoch)*cond_num)
+        
+    #     devi_dist = np.zeros_like(stim1s)
+    #     for nst in range(stim_per_epoch):
+    #         for n_cond in range(cond_num):
+    #             shift = n_cond*trial_per_cond+4*nst
+    #             devi_dist[nst,shift:shift+2] = 2*np.pi/config['n_eachring']
+    #             devi_dist[nst,shift+2:shift+4] = 2*np.pi*(1-1/config['n_eachring'])
+
+    #     stim2s = (stim1s + devi_dist)%(2*np.pi)
+
+    #     #Timeline
+    #     stim1_ons  = int(1000/dt)
+    #     stim1_offs = stim1_ons + int(500/dt) #last for 0.5s
+
+    #     stim2_ons= stim1_offs+int(delaytime/dt) #delay
+    #     stim2_offs= stim2_ons+int(500/dt) # last for 0.5s
+
+    #     choice_ons= stim2_offs+int(delaytime2/dt) #delay
+
+    #     fix_offs = choice_ons
+        
+    #     tdim     = fix_offs + int(500/dt)
 
     else:
         raise ValueError('Unknown mode: ' + str(mode))
@@ -1834,11 +2142,11 @@ def Capacity_color_mix_uniform_(config, mode, stim_per_epoch, delay_time_bound=(
         for tn, idx in enumerate(stim_ring_indexes):
             stim_mods_[tn,idx] = 1
         stim_mods = [tuple(i) for i in stim_mods_]
-        trial.add('stim', stim1s[0], ons=stim1_ons, offs=stim1_offs, mods=stim_mods)
-        trial.add('stim', stim2s[0], ons=stim2_ons, offs=stim2_offs, mods=stim_mods)
+        trial.add('stim', stim1s[0], ons=stim1_ons, offs=stim1_offs, mods=stim_mods,add_mode=add_mode)
+        trial.add('stim', stim2s[0], ons=stim2_ons, offs=stim2_offs, mods=stim_mods,add_mode=add_mode)
     else:
-        trial.add('stim', stim1s[0], ons=stim1_ons, offs=stim1_offs, mods=(1,)*color_channel_num)#RGB(white)
-        trial.add('stim', stim2s[0], ons=stim2_ons, offs=stim2_offs, mods=(1,)*color_channel_num)#RGB(white)
+        trial.add('stim', stim1s[0], ons=stim1_ons, offs=stim1_offs, mods=(1,)*color_channel_num,add_mode=add_mode)#RGB(white)
+        trial.add('stim', stim2s[0], ons=stim2_ons, offs=stim2_offs, mods=(1,)*color_channel_num,add_mode=add_mode)#RGB(white)
     for i in range(1,stim_per_epoch):
         if not white_stims:
             distract_ring_indexes = (stim_ring_indexes+i)%stim_per_epoch
@@ -1846,14 +2154,14 @@ def Capacity_color_mix_uniform_(config, mode, stim_per_epoch, delay_time_bound=(
             for tn, idx in enumerate(distract_ring_indexes):
                 distr_mods_[tn,idx] = 1
             distr_mods = [tuple(i) for i in distr_mods_]
-            trial.add('stim', stim1s[i], ons=stim1_ons, offs=stim1_offs, mods=distr_mods)
-            trial.add('stim', stim2s[i], ons=stim2_ons, offs=stim2_offs, mods=distr_mods)
+            trial.add('stim', stim1s[i], ons=stim1_ons, offs=stim1_offs, mods=distr_mods,add_mode=add_mode)
+            trial.add('stim', stim2s[i], ons=stim2_ons, offs=stim2_offs, mods=distr_mods,add_mode=add_mode)
         else:
-            trial.add('stim', stim1s[i], ons=stim1_ons, offs=stim1_offs, mods=(1,)*color_channel_num)#RGB(white)
-            trial.add('stim', stim2s[i], ons=stim2_ons, offs=stim2_offs, mods=(1,)*color_channel_num)#RGB(white)
+            trial.add('stim', stim1s[i], ons=stim1_ons, offs=stim1_offs, mods=(1,)*color_channel_num,add_mode=add_mode)#RGB(white)
+            trial.add('stim', stim2s[i], ons=stim2_ons, offs=stim2_offs, mods=(1,)*color_channel_num,add_mode=add_mode)#RGB(white)
 
-    trial.add('choice', M_choice_loc, ons=choice_ons, mods=(1,0))#Red
-    trial.add('choice', NM_choice_loc, ons=choice_ons, mods=(0,1))#Green
+    trial.add('choice', M_choice_loc, ons=choice_ons, mods=(1,0),add_mode=add_mode)#Red
+    trial.add('choice', NM_choice_loc, ons=choice_ons, mods=(0,1),add_mode=add_mode)#Green
 
     trial.add('fix_out', offs=fix_offs)
     trial.add('out', response_locs, ons=fix_offs)
@@ -1867,7 +2175,7 @@ def Capacity_color_mix_uniform_(config, mode, stim_per_epoch, delay_time_bound=(
                    'delay2'    : (stim2_offs, choice_ons),
                    'go1'       : (fix_offs, None)} #go period is also the choice display period
 
-    if mode == 'test':
+    if mode == 'test' or mode == 'move_one_loc':
         stim1_conditions = (stim1s.T/(2 * np.pi)*config['n_eachring']).astype(np.int32)
         stim1_conditions = np.array([int(''.join([str(s) for s in s1])) for s1 in stim1_conditions])
         stim2_conditions = (stim2s.T/(2 * np.pi)*config['n_eachring']).astype(np.int32)
@@ -1893,6 +2201,37 @@ def Capacity_color_mix_uniform_001001(config, mode, **kwargs):
 
 def Capacity_color_mix_uniform_001005(config, mode, **kwargs):
     return Capacity_color_mix_uniform_(config, mode, 3, delay_time_bound=(0,1000), delay_step=500,**kwargs)
+
+def Capacity_clr_mixuni_1stim_0105_mx(config, mode, **kwargs):
+    return Capacity_color_mix_uniform_(config, mode, 1, delay_time_bound=(0,1000), delay_step=500, white_stims=True, add_mode='maximum',**kwargs)
+
+def Capacity_clr_mixuni_2stim_0105_mx(config, mode, **kwargs):
+    return Capacity_color_mix_uniform_(config, mode, 2, delay_time_bound=(0,1000), delay_step=500, white_stims=True, add_mode='maximum',**kwargs)
+
+def Capacity_clr_mixuni_3stim_0105_mx(config, mode, **kwargs):
+    return Capacity_color_mix_uniform_(config, mode, 3, delay_time_bound=(0,1000), delay_step=500, white_stims=True, add_mode='maximum',**kwargs)
+
+def Capacity_clr_mixuni_4stim_0105_mx(config, mode, **kwargs):
+    return Capacity_color_mix_uniform_(config, mode, 4, delay_time_bound=(0,1000), delay_step=500, white_stims=True, add_mode='maximum',**kwargs)
+
+def Capacity_clr_mixuni_5stim_0105_mx(config, mode, **kwargs):
+    return Capacity_color_mix_uniform_(config, mode, 5, delay_time_bound=(0,1000), delay_step=500, white_stims=True, add_mode='maximum',**kwargs)
+################################################################################
+
+def Capacity_clr_mixuni_1stim_0105(config, mode, **kwargs):
+    return Capacity_color_mix_uniform_(config, mode, 1, delay_time_bound=(0,1000), delay_step=500, white_stims=True,**kwargs)
+
+def Capacity_clr_mixuni_2stim_0105(config, mode, **kwargs):
+    return Capacity_color_mix_uniform_(config, mode, 2, delay_time_bound=(0,1000), delay_step=500, white_stims=True,**kwargs)
+
+def Capacity_clr_mixuni_3stim_0105(config, mode, **kwargs):
+    return Capacity_color_mix_uniform_(config, mode, 3, delay_time_bound=(0,1000), delay_step=500, white_stims=True,**kwargs)
+
+def Capacity_clr_mixuni_4stim_0105(config, mode, **kwargs):
+    return Capacity_color_mix_uniform_(config, mode, 4, delay_time_bound=(0,1000), delay_step=500, white_stims=True,**kwargs)
+
+def Capacity_clr_mixuni_5stim_0105(config, mode, **kwargs):
+    return Capacity_color_mix_uniform_(config, mode, 5, delay_time_bound=(0,1000), delay_step=500, white_stims=True,**kwargs)
 
 def Capacity_strength_(config, mode, delaytime, stim_per_epoch, fix_choice_loc=True,delaytime2=None,**kwargs):
     #                delay1    delay2
@@ -1931,7 +2270,7 @@ def Capacity_strength_(config, mode, delaytime, stim_per_epoch, fix_choice_loc=T
 
     elif mode == 'test':
         for i in range(9,4,-1): #9~5
-            if config['n_eachring']%i == 0 and i > stim_per_epoch:
+            if config['n_eachring']%i == 0 and i >= stim_per_epoch:
                 step = config['n_eachring']//i
                 sub_sample_num = i
                 break
@@ -2068,7 +2407,7 @@ def Capacity_strength_mix_uniform_(config, mode, stim_per_epoch, delay_time_boun
 
     elif 'test' in mode:
         for i in range(9,4,-1): #9~5
-            if config['n_eachring']%i == 0 and i > stim_per_epoch:
+            if config['n_eachring']%i == 0 and i >= stim_per_epoch:
                 step = config['n_eachring']//i
                 sub_sample_num = i
                 break
@@ -2216,12 +2555,30 @@ rule_mapping = {
                 'Capacity_color_3_stims_white_stims_1s05s':Capacity_color_3_stims_white_stims_1s05s,
                 'Capacity_color_4_stims_white_stims_1s05s':Capacity_color_4_stims_white_stims_1s05s,
                 'Capacity_color_5_stims_white_stims_1s05s':Capacity_color_5_stims_white_stims_1s05s,
+                'Capacity_color_6_stims_white_stims_1s05s':Capacity_color_6_stims_white_stims_1s05s,
+                'Capacity_color_7_stims_white_stims_1s05s':Capacity_color_7_stims_white_stims_1s05s,
+                'Capacity_color_8_stims_white_stims_1s05s':Capacity_color_8_stims_white_stims_1s05s,
 
                 'Capacity_color_1_stims_wht_stims_1s05s_mx':Capacity_color_1_stims_wht_stims_1s05s_mx,
                 'Capacity_color_2_stims_wht_stims_1s05s_mx':Capacity_color_2_stims_wht_stims_1s05s_mx,
                 'Capacity_color_3_stims_wht_stims_1s05s_mx':Capacity_color_3_stims_wht_stims_1s05s_mx,
                 'Capacity_color_4_stims_wht_stims_1s05s_mx':Capacity_color_4_stims_wht_stims_1s05s_mx,
                 'Capacity_color_5_stims_wht_stims_1s05s_mx':Capacity_color_5_stims_wht_stims_1s05s_mx,
+                'Capacity_color_6_stims_wht_stims_1s05s_mx':Capacity_color_6_stims_wht_stims_1s05s_mx,
+                'Capacity_color_7_stims_wht_stims_1s05s_mx':Capacity_color_7_stims_wht_stims_1s05s_mx,
+                'Capacity_color_8_stims_wht_stims_1s05s_mx':Capacity_color_8_stims_wht_stims_1s05s_mx,
+
+                'Capacity_clr_mixuni_1stim_0105_mx':Capacity_clr_mixuni_1stim_0105_mx,
+                'Capacity_clr_mixuni_2stim_0105_mx':Capacity_clr_mixuni_2stim_0105_mx,
+                'Capacity_clr_mixuni_3stim_0105_mx':Capacity_clr_mixuni_3stim_0105_mx,
+                'Capacity_clr_mixuni_4stim_0105_mx':Capacity_clr_mixuni_4stim_0105_mx,
+                'Capacity_clr_mixuni_5stim_0105_mx':Capacity_clr_mixuni_5stim_0105_mx,
+
+                'Capacity_clr_mixuni_1stim_0105':Capacity_clr_mixuni_1stim_0105,
+                'Capacity_clr_mixuni_2stim_0105':Capacity_clr_mixuni_2stim_0105,
+                'Capacity_clr_mixuni_3stim_0105':Capacity_clr_mixuni_3stim_0105,
+                'Capacity_clr_mixuni_4stim_0105':Capacity_clr_mixuni_4stim_0105,
+                'Capacity_clr_mixuni_5stim_0105':Capacity_clr_mixuni_5stim_0105,
 
                 'Capacity_color_mix_uniform_001001':Capacity_color_mix_uniform_001001,
                 'Capacity_color_mix_uniform_001005':Capacity_color_mix_uniform_001005,
@@ -2281,12 +2638,30 @@ rule_name    = {
                 'Capacity_color_3_stims_white_stims_1s05s':'Capacity color encoded, 3 white stimulus, D1:1s D2:0.5s',
                 'Capacity_color_4_stims_white_stims_1s05s':'Capacity color encoded, 4 white stimulus, D1:1s D2:0.5s',
                 'Capacity_color_5_stims_white_stims_1s05s':'Capacity color encoded, 5 white stimulus, D1:1s D2:0.5s',
+                'Capacity_color_6_stims_white_stims_1s05s':'Capacity color encoded, 6 white stimulus, D1:1s D2:0.5s',
+                'Capacity_color_7_stims_white_stims_1s05s':'Capacity color encoded, 7 white stimulus, D1:1s D2:0.5s',
+                'Capacity_color_8_stims_white_stims_1s05s':'Capacity color encoded, 8 white stimulus, D1:1s D2:0.5s',
 
                 'Capacity_color_1_stims_wht_stims_1s05s_mx':'Capacity color encoded add by mx, 1 white stimulus, D1:1s D2:0.5s',
                 'Capacity_color_2_stims_wht_stims_1s05s_mx':'Capacity color encoded add by mx, 2 white stimulus, D1:1s D2:0.5s',
                 'Capacity_color_3_stims_wht_stims_1s05s_mx':'Capacity color encoded add by mx, 3 white stimulus, D1:1s D2:0.5s',
                 'Capacity_color_4_stims_wht_stims_1s05s_mx':'Capacity color encoded add by mx, 4 white stimulus, D1:1s D2:0.5s',
                 'Capacity_color_5_stims_wht_stims_1s05s_mx':'Capacity color encoded add by mx, 5 white stimulus, D1:1s D2:0.5s',
+                'Capacity_color_6_stims_wht_stims_1s05s_mx':'Capacity color encoded add by mx, 6 white stimulus, D1:1s D2:0.5s',
+                'Capacity_color_7_stims_wht_stims_1s05s_mx':'Capacity color encoded add by mx, 7 white stimulus, D1:1s D2:0.5s',
+                'Capacity_color_8_stims_wht_stims_1s05s_mx':'Capacity color encoded add by mx, 8 white stimulus, D1:1s D2:0.5s',
+
+                'Capacity_clr_mixuni_1stim_0105_mx':'Capacity color encoded add by mx, 1 white stimulus, 0~1s, 0.5s step',
+                'Capacity_clr_mixuni_2stim_0105_mx':'Capacity color encoded add by mx, 1 white stimulus, 0~1s, 0.5s step',
+                'Capacity_clr_mixuni_3stim_0105_mx':'Capacity color encoded add by mx, 1 white stimulus, 0~1s, 0.5s step',
+                'Capacity_clr_mixuni_4stim_0105_mx':'Capacity color encoded add by mx, 1 white stimulus, 0~1s, 0.5s step',
+                'Capacity_clr_mixuni_5stim_0105_mx':'Capacity color encoded add by mx, 1 white stimulus, 0~1s, 0.5s step',
+
+                'Capacity_clr_mixuni_1stim_0105':'Capacity color encoded, 1 white stimulus, 0~1s, 0.5s step',
+                'Capacity_clr_mixuni_2stim_0105':'Capacity color encoded, 1 white stimulus, 0~1s, 0.5s step',
+                'Capacity_clr_mixuni_3stim_0105':'Capacity color encoded, 1 white stimulus, 0~1s, 0.5s step',
+                'Capacity_clr_mixuni_4stim_0105':'Capacity color encoded, 1 white stimulus, 0~1s, 0.5s step',
+                'Capacity_clr_mixuni_5stim_0105':'Capacity color encoded, 1 white stimulus, 0~1s, 0.5s step',
 
                 'Capacity_color_mix_uniform_001001':'Capacity mix delay 0s~1s,0.1s',
                 'Capacity_color_mix_uniform_001005':'Capacity mix delay 0s~1s,0.5s',
