@@ -327,7 +327,13 @@ def train_sequential(
                     trial = step_total * hp['batch_size_train']
                     log['trials'].append(trial)
                     tools.mkdir_p(model_dir+'/'+str(trial))# add by yichen
-                    log['times'].append(time.time()-t_start)
+                    time_trained = time.time()-t_start
+                    log['times'].append(time_trained)
+                    day = time_trained//(60*60*24)
+                    hour = time_trained%(60*60*24)//(60*60)
+                    minute = time_trained%(60*60)//60
+                    second = time_trained%60
+                    print("time trained: "+str(day)+"D-"+str(hour)+"H-"+str(minute)+"M-"+str(second)+"S")
                     log['rule_now'].append(rule_train)
                     log = do_eval(sess, model, log, rule_train)
                     if log['perf_avg'][-1] > model.hp['target_perf']:

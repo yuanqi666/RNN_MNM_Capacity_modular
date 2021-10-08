@@ -331,9 +331,16 @@ def train(model_dir,
                     trial_number = step * hp['batch_size_train']# add by yichen
                     log['trials'].append(trial_number)
                     tools.mkdir_p(model_dir+'/'+str(trial_number))# add by yichen
-                    log['times'].append(time.time()-t_start)
+                    time_trained = time.time()-t_start
+                    log['times'].append(time_trained)
+                    day = time_trained//(60*60*24)
+                    hour = time_trained%(60*60*24)//(60*60)
+                    minute = time_trained%(60*60)//60
+                    second = time_trained%60
+                    print("time trained: "+str(day)+"D-"+str(hour)+"H-"+str(minute)+"M-"+str(second)+"S")
                     log = do_eval(sess, model, log, hp['rule_trains'])
                     #check if minimum performance is above target 
+
 
                     if log['perf_min'][-1] > model.hp['target_perf']:
                         print('Perf reached the target: {:0.2f}'.format(
